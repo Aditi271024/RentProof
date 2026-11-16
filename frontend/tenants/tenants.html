@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentProof - Tenant Management</title>
+  <!-- Shared Design System CSS -->
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="../shared/sidebar.css">
+  <!-- Shweta's Module CSS -->
+  <link rel="stylesheet" href="tenants.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ==========================================
+         COLLAPSIBLE LEFT SIDEBAR (Midnight Blue)
+         ========================================== -->
+    <aside class="sidebar" id="appSidebar">
+      
+      <!-- Brand Logo / Header -->
+      <div class="sidebar-header">
+        <a href="../properties/properties.html" class="brand-link">
+          <div class="brand-logo-icon">RP</div>
+          <span class="brand-name">Rent<span>Proof</span></span>
+        </a>
+      </div>
+
+      <!-- Navigation Menu Items -->
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Portal</div>
+        
+        <a href="../properties/properties.html" class="nav-item" data-tooltip="Properties">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-label">Properties</span>
+        </a>
+
+        <!-- Shweta's Module Link (Active) -->
+        <a href="tenants.html" class="nav-item active" data-tooltip="Tenants Management">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Tenants</span>
+        </a>
+
+        <a href="assign-property.html" class="nav-item" data-tooltip="Assign Property">
+          <span class="nav-icon">🔑</span>
+          <span class="nav-label">Assign Property</span>
+        </a>
+
+        <div class="nav-section-title">Team Modules</div>
+
+        <!-- Aanvi's Module Link -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Payments (Aanvi)" onclick="showModuleNotice('Rent & Payments', 'Aanvi')">
+          <span class="nav-icon">💳</span>
+          <span class="nav-label">Rent & Payments</span>
+        </a>
+
+        <!-- Gungun's Module Link -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reminders (Gungun)" onclick="showModuleNotice('Reminders & Alerts', 'Gungun')">
+          <span class="nav-icon">🔔</span>
+          <span class="nav-label">Reminders</span>
+        </a>
+
+        <div class="nav-section-title">System</div>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports" onclick="alert('Reports module: Generates occupancy reports and rental ledgers.')">
+          <span class="nav-icon">📈</span>
+          <span class="nav-label">Reports</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings" onclick="alert('Settings: Landlord profile and preferences.')">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Footer / Logout -->
+      <div class="sidebar-footer">
+        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Logout">
+          <span class="nav-icon">🚪</span>
+          <span class="logout-text">Sign Out</span>
+        </a>
+      </div>
+
+    </aside>
+
+    <!-- ==========================================
+         MAIN CONTENT CANVAS (Ivory Background)
+         ========================================== -->
+    <div class="main-wrapper">
+
+      <!-- TOP NAVBAR -->
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Navigation Sidebar">
+            ☰
+          </button>
+          
+          <div class="nav-search-bar">
+            <span class="nav-search-icon">🔍</span>
+            <input 
+              type="text" 
+              class="nav-search-input" 
+              id="globalTenantSearch" 
+              placeholder="Quick search across properties..."
+              oninput="if(document.getElementById('tenantSearchInput')){document.getElementById('tenantSearchInput').value=this.value;renderTenantDashboard();}"
+            >
+          </div>
+        </div>
+
+        <div class="navbar-right">
+          <button class="notification-btn" title="System Notifications" onclick="alert('All tenant records and room assignments are up to date.')">
+            🔔
+            <span class="notification-badge"></span>
+          </button>
+
+          <!-- Landlord Profile Pill -->
+          <div class="landlord-profile-pill" onclick="alert('Logged in Landlord: Aditi Sharma\nRole: Property Administrator\nActive Module: Tenant Management (Shweta)')">
+            <div class="profile-avatar" id="landlordAvatarInitials">AS</div>
+            <div class="profile-details">
+              <span class="profile-name" id="landlordDisplayName">Aditi Sharma</span>
+              <span class="profile-role">Landlord &bull; Active</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- PAGE CONTENT AREA -->
+      <main class="page-content">
+        <div class="page-container">
+
+          <!-- Page Header & Action Buttons -->
+          <div class="page-header-bar">
+            <div class="page-title-block">
+              <h1>Tenant Management</h1>
+              <p>Register, onboard, and oversee all active tenants across your rental properties.</p>
+            </div>
+            <div class="header-action-group">
+              <a href="assign-property.html" class="btn btn-secondary">
+                🔑 Assign Room
+              </a>
+              <a href="add-tenant.html" class="btn btn-primary">
+                ➕ Add Tenant
+              </a>
+            </div>
+          </div>
+
+          <!-- 3 Real-Time Statistical Summary Cards -->
+          <section class="stats-grid">
+            
+            <div class="stat-card">
+              <div class="stat-icon icon-sand">👥</div>
+              <div class="stat-content">
+                <span class="stat-value" id="statTotalTenants">0</span>
+                <span class="stat-label">Total Tenants</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon icon-success">✅</div>
+              <div class="stat-content">
+                <span class="stat-value" id="statActiveTenants" style="color: var(--success);">0</span>
+                <span class="stat-label">Active Tenants</span>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon icon-warning">🚪</div>
+              <div class="stat-content">
+                <span class="stat-value" id="statVacantRooms" style="color: var(--warning);">0</span>
+                <span class="stat-label">Vacant Available Rooms</span>
+              </div>
+            </div>
+
+          </section>
+
+          <!-- Search & Filter Toolbar -->
+          <section class="toolbar-card">
+            
+            <div class="toolbar-left">
+              <!-- Search by Name or Phone -->
+              <div class="search-input-wrapper">
+                <span class="search-icon-inside">🔍</span>
+                <input 
+                  type="text" 
+                  id="tenantSearchInput" 
+                  placeholder="Search by name, phone or email..."
+                >
+              </div>
+
+              <!-- Filter by Property -->
+              <div class="filter-group">
+                <span class="filter-label">Property:</span>
+                <select class="filter-select" id="propertyFilter">
+                  <option value="ALL">All Properties</option>
+                </select>
+              </div>
+
+              <!-- Filter by Status -->
+              <div class="filter-group">
+                <span class="filter-label">Status:</span>
+                <select class="filter-select" id="statusFilter">
+                  <option value="ALL">All Statuses</option>
+                  <option value="Active">Active</option>
+                  <option value="Moved Out">Moved Out</option>
+                  <option value="Pending">Pending</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="toolbar-right">
+              <button class="btn-reset-filters" id="resetFiltersBtn">
+                ↺ Reset Filters
+              </button>
+            </div>
+
+          </section>
+
+          <!-- Tenant Records Table Card -->
+          <div class="table-card" id="tenantsTableWrapper">
+            <div class="table-responsive">
+              <table class="tenants-table">
+                <thead>
+                  <tr>
+                    <th>Tenant ID</th>
+                    <th>Tenant Name</th>
+                    <th>Phone / Email</th>
+                    <th>Property Name</th>
+                    <th>Room Number</th>
+                    <th>Monthly Rent</th>
+                    <th>Joining Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="tenantsTableBody">
+                  <!-- Dynamically populated by tenants.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Empty State (Displayed when 0 records match) -->
+          <div class="table-card empty-state" id="emptyStateContainer" style="display: none;">
+            <div class="empty-state-icon">👤</div>
+            <h3>No Tenant Records Found</h3>
+            <p>No tenant records match your current search or filter criteria. Add a new tenant or clear your filters to view records.</p>
+            <div style="display: flex; gap: 12px;">
+              <a href="add-tenant.html" class="btn btn-primary">➕ Register New Tenant</a>
+              <button class="btn btn-secondary" onclick="document.getElementById('resetFiltersBtn').click()">Reset Filters</button>
+            </div>
+          </div>
+
+        </div>
+      </main>
+
+    </div>
+
+  </div>
+
+  <!-- ==========================================
+       MODAL 1: VIEW TENANT DETAILS
+       ========================================== -->
+  <div class="modal-overlay" id="viewTenantModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Tenant Information</h3>
+        <button class="modal-close-btn" title="Close Modal">&times;</button>
+      </div>
+      <div class="modal-body" id="viewTenantDetailsContent">
+        <!-- Injected dynamically by openViewTenantModal -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-cancel-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL 2: DELETE CONFIRMATION DIALOG
+       ========================================== -->
+  <div class="modal-overlay" id="deleteConfirmModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="color: var(--danger);">Confirm Tenant Deletion</h3>
+        <button class="modal-close-btn" title="Close Modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 12px; font-size: 0.95rem;">
+          Are you sure you want to delete the tenant record for:
+        </p>
+        <div style="padding: 12px 16px; background-color: var(--danger-bg); border-radius: var(--radius-sm); border-left: 3px solid var(--danger); margin-bottom: 16px;">
+          <strong id="deleteTenantNamePrompt" style="color: var(--danger);">Tenant Name</strong>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--slate-muted);">
+          ⚠️ This will release their assigned room back to <strong>'Vacant'</strong> status. This action cannot be undone.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-cancel-btn">Cancel</button>
+        <button class="btn btn-danger" id="confirmDeleteBtn">Delete Tenant</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shweta's Module JavaScript -->
+  <script src="tenants.js"></script>
+</body>
+</html>
