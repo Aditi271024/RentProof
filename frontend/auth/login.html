@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentProof - Landlord Login</title>
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="auth.css">
+</head>
+<body class="auth-page">
+
+  <div class="auth-card-container">
+    
+    <!-- Left Hero Panel (Midnight Blue) -->
+    <div class="auth-hero-panel">
+      <div class="auth-brand-logo">
+        <div class="auth-logo-badge">RP</div>
+        <div class="auth-brand-title">Rent<span>Proof</span></div>
+      </div>
+
+      <div class="auth-hero-content">
+        <h1 class="auth-hero-heading">Smart Property & Rental Management.</h1>
+        <p class="auth-hero-tagline">
+          The all-in-one portal designed exclusively for landlords to manage properties, monitor rooms, and maintain verified rental records.
+        </p>
+
+        <div class="feature-list">
+          <div class="feature-item">
+            <span class="feature-icon">✓</span>
+            <span>Centralized real estate & room inventory</span>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">✓</span>
+            <span>Accurate occupancy and vacancy tracking</span>
+          </div>
+          <div class="feature-item">
+            <span class="feature-icon">✓</span>
+            <span>Verified tenant records and payment proofs</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="auth-hero-footer">
+        &copy; 2026 RentProof SaaS &bull; Module Lead: Aditi Sharma
+      </div>
+    </div>
+
+    <!-- Right Form Panel (Ivory / White) -->
+    <div class="auth-form-panel">
+      <div class="auth-form-header">
+        <h2>Landlord Portal Login</h2>
+        <p>Please enter your registered credentials to access your properties.</p>
+      </div>
+
+      <!-- Feedback Alert Box -->
+      <div id="loginAlert" class="alert" style="display: none;"></div>
+
+      <form id="loginForm" novalidate>
+        
+        <!-- Email Field -->
+        <div class="form-group">
+          <label class="form-label" for="loginEmail">Email Address <span class="required">*</span></label>
+          <input 
+            type="email" 
+            id="loginEmail" 
+            class="form-control" 
+            placeholder="e.g. aditi.landlord@rentproof.com"
+            autocomplete="email"
+            required
+          >
+          <div id="loginEmailError" class="form-error"></div>
+        </div>
+
+        <!-- Password Field -->
+        <div class="form-group">
+          <label class="form-label" for="loginPassword">Password <span class="required">*</span></label>
+          <div class="password-wrapper">
+            <input 
+              type="password" 
+              id="loginPassword" 
+              class="form-control" 
+              placeholder="Enter your secret password"
+              autocomplete="current-password"
+              required
+            >
+            <button type="button" class="password-toggle-btn" data-target="loginPassword">👁️ Show</button>
+          </div>
+          <div id="loginPasswordError" class="form-error"></div>
+        </div>
+
+        <!-- Form Extras: Remember Me & Forgot Password -->
+        <div class="form-extras">
+          <label class="remember-me-checkbox">
+            <input type="checkbox" id="rememberMe">
+            <span>Remember me</span>
+          </label>
+          <a href="javascript:void(0)" class="forgot-password-link" onclick="handleForgotPassword()">
+            Forgot Password?
+          </a>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="btn btn-primary auth-submit-btn">
+          Sign In to RentProof &rarr;
+        </button>
+
+        <!-- Switch Link to Register -->
+        <p class="auth-switch-text">
+          Don't have a landlord account yet? 
+          <a href="register.html">Register here</a>
+        </p>
+
+        <!-- Quick Fill for College Project Evaluator / Viva Demo -->
+        <div class="demo-account-box">
+          <strong>Faculty / Viva Demo Account:</strong><br>
+          Email: <code>aditi.landlord@rentproof.com</code> | Password: <code>RentProof@123</code>
+          <div>
+            <button type="button" id="quickFillBtn" class="quick-fill-btn">⚡ Auto-fill Demo Credentials</button>
+          </div>
+        </div>
+
+      </form>
+    </div>
+
+  </div>
+
+  <script src="auth.js"></script>
+</body>
+</html>

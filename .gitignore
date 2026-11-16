@@ -1,0 +1,11 @@
+# Database credentials
+backend/src/main/resources/db.properties
+
+# Compiled files
+*.class
+bin/
+target/
+
+# IDE files
+.vscode/
+.idea/

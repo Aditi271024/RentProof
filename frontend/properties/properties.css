@@ -1,0 +1,314 @@
+/* ==============================================================================
+   RENTPROOF - PROPERTY MANAGEMENT STYLES
+   Theme: Midnight Blue & Ivory
+   ============================================================================== */
+
+/* Page Header & Actions Bar */
+.page-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.page-title-block h1 {
+  font-size: 1.75rem;
+  color: var(--navy);
+  margin-bottom: 4px;
+}
+
+.page-title-block p {
+  color: var(--slate-muted);
+  font-size: 0.925rem;
+}
+
+/* Filter & Search Toolbar */
+.toolbar-card {
+  background: var(--white);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--sand-light);
+  box-shadow: var(--shadow-xs);
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 280px;
+  flex-wrap: wrap;
+}
+
+.search-box-wrapper {
+  position: relative;
+  flex: 1;
+  min-width: 220px;
+}
+
+.search-box-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--slate-muted);
+  font-size: 0.95rem;
+}
+
+.search-box-input {
+  width: 100%;
+  padding: 9px 14px 9px 36px;
+  border: 1.5px solid var(--sand);
+  border-radius: var(--radius-sm);
+  background-color: var(--ivory);
+  font-size: 0.9rem;
+  color: var(--slate);
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.search-box-input:focus {
+  background-color: var(--white);
+  border-color: var(--steel-blue);
+  box-shadow: 0 0 0 3px rgba(82, 107, 130, 0.15);
+}
+
+.filter-select {
+  padding: 9px 14px;
+  border: 1.5px solid var(--sand);
+  border-radius: var(--radius-sm);
+  background-color: var(--ivory);
+  font-size: 0.9rem;
+  color: var(--navy);
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  min-width: 150px;
+  transition: all var(--transition-fast);
+}
+
+.filter-select:focus {
+  border-color: var(--steel-blue);
+  background-color: var(--white);
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Property Grid Layout */
+.properties-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 24px;
+}
+
+/* Individual Property Card */
+.property-card {
+  background: var(--white);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--sand-light);
+  box-shadow: var(--shadow-card);
+  transition: all var(--transition-normal);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.property-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-hover);
+  border-color: var(--sand);
+}
+
+.property-card-top {
+  padding: 20px 22px 14px;
+  border-bottom: 1px solid var(--sand-light);
+  background-color: var(--ivory-card);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.property-name-wrap {
+  flex: 1;
+}
+
+.property-name-heading {
+  font-size: 1.15rem;
+  color: var(--navy);
+  font-weight: 700;
+  margin-bottom: 4px;
+  line-height: 1.3;
+}
+
+.property-location-tag {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.85rem;
+  color: var(--slate-muted);
+}
+
+.property-card-body {
+  padding: 20px 22px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.property-address-text {
+  font-size: 0.9rem;
+  color: var(--slate);
+  line-height: 1.45;
+  background-color: var(--ivory);
+  padding: 10px 12px;
+  border-radius: var(--radius-xs);
+  border-left: 3px solid var(--steel-blue);
+}
+
+.property-metrics-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background-color: var(--ivory-card);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--sand-light);
+}
+
+.metric-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--slate-muted);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.metric-val {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--navy);
+}
+
+.metric-rent {
+  color: var(--steel-blue);
+}
+
+/* Occupancy mini progress */
+.occupancy-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.meter-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.825rem;
+}
+
+.meter-label {
+  color: var(--slate);
+  font-weight: 500;
+}
+
+.meter-counts {
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.meter-bar-track {
+  width: 100%;
+  height: 8px;
+  background-color: var(--ivory-alt);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  border: 1px solid var(--sand-light);
+}
+
+.meter-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--navy), var(--steel-blue));
+  border-radius: var(--radius-full);
+  transition: width 0.4s ease;
+}
+
+.property-card-actions {
+  padding: 14px 22px;
+  background-color: var(--ivory-card);
+  border-top: 1px solid var(--sand-light);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-action-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Empty State Box */
+.empty-state-box {
+  background: var(--white);
+  border-radius: var(--radius-md);
+  border: 2px dashed var(--sand);
+  padding: 50px 30px;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.empty-state-icon {
+  font-size: 3rem;
+  color: var(--sand);
+  margin-bottom: 14px;
+}
+
+.empty-state-title {
+  font-size: 1.3rem;
+  color: var(--navy);
+  margin-bottom: 6px;
+}
+
+.empty-state-desc {
+  font-size: 0.925rem;
+  color: var(--slate-muted);
+  max-width: 440px;
+  margin: 0 auto 20px;
+}
+
+/* Form Container for Add / Edit */
+.property-form-card {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.form-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--sand-light);
+}

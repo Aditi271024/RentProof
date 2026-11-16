@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentProof - Edit Property</title>
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="../shared/sidebar.css">
+  <link rel="stylesheet" href="properties.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ==========================================
+         COLLAPSIBLE LEFT SIDEBAR
+         ========================================== -->
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <a href="properties.html" class="brand-link">
+          <div class="brand-logo-icon">RP</div>
+          <span class="brand-name">Rent<span>Proof</span></span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Portal</div>
+        
+        <a href="properties.html" class="nav-item active" data-tooltip="Properties">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-label">Properties</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Dashboard" onclick="showModuleNotice('Dashboard Overview', 'Aditi Sharma')">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <div class="nav-section-title">Team Modules</div>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Tenants (Shweta)" onclick="showModuleNotice('Tenants Management', 'Shweta')">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Tenants</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Payments (Aanvi)" onclick="showModuleNotice('Rent & Payments', 'Aanvi')">
+          <span class="nav-icon">💳</span>
+          <span class="nav-label">Rent & Payments</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reminders (Gungun)" onclick="showModuleNotice('Reminders & Alerts', 'Gungun')">
+          <span class="nav-icon">🔔</span>
+          <span class="nav-label">Reminders</span>
+        </a>
+
+        <div class="nav-section-title">System</div>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports" onclick="alert('Reports module placeholder.')">
+          <span class="nav-icon">📈</span>
+          <span class="nav-label">Reports</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings" onclick="alert('Settings module placeholder.')">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Logout">
+          <span class="nav-icon">🚪</span>
+          <span class="logout-text">Sign Out</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- ==========================================
+         MAIN CONTENT AREA
+         ========================================== -->
+    <div class="main-wrapper">
+
+      <!-- TOP NAVBAR -->
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Navigation Sidebar">
+            ☰
+          </button>
+          <div style="font-size: 0.95rem; font-weight: 600; color: var(--navy);">
+            Properties &gt; Edit Property Details
+          </div>
+        </div>
+
+        <div class="navbar-right">
+          <button class="notification-btn" title="System Notifications">
+            🔔
+            <span class="notification-badge"></span>
+          </button>
+
+          <div class="landlord-profile-pill">
+            <div class="profile-avatar" id="landlordAvatarInitials">AS</div>
+            <div class="profile-details">
+              <span class="profile-name" id="landlordDisplayName">Aditi Sharma</span>
+              <span class="profile-role">Landlord &bull; Active</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- PAGE CONTENT CANVAS -->
+      <main class="page-content">
+
+        <div class="page-header-bar">
+          <div class="page-title-block">
+            <h1>Edit Property</h1>
+            <p>Modify specifications, room capacity, and monthly rates for this property.</p>
+          </div>
+          <a href="properties.html" class="btn btn-outline">
+            &larr; Back to Properties
+          </a>
+        </div>
+
+        <!-- Property Entry Form Card -->
+        <div class="card property-form-card">
+          <div class="card-header">
+            <h3>Update Property Information</h3>
+            <span style="font-size: 0.8rem; color: var(--slate-muted);">Fields marked with <span style="color: var(--danger);">*</span> are mandatory</span>
+          </div>
+
+          <div class="card-body">
+            <form id="editPropertyForm" novalidate>
+              <input type="hidden" id="editPropertyId">
+
+              <!-- Row 1: Name and Type -->
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label class="form-label" for="editPropName">Property Name <span class="required">*</span></label>
+                  <input 
+                    type="text" 
+                    id="editPropName" 
+                    class="form-control" 
+                    placeholder="e.g. Sunrise Executive PG"
+                    required
+                  >
+                  <div id="editPropNameError" class="form-error"></div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="editPropType">Property Type <span class="required">*</span></label>
+                  <select id="editPropType" class="form-select" required>
+                    <option value="PG">PG (Paying Guest)</option>
+                    <option value="Flat">Flat</option>
+                    <option value="Apartment">Apartment</option>
+                    <option value="House">House / Villa</option>
+                  </select>
+                  <div id="editPropTypeError" class="form-error"></div>
+                </div>
+              </div>
+
+              <!-- Street Address -->
+              <div class="form-group">
+                <label class="form-label" for="editPropAddress">Street Address / Locality <span class="required">*</span></label>
+                <input 
+                  type="text" 
+                  id="editPropAddress" 
+                  class="form-control" 
+                  required
+                >
+                <div id="editPropAddressError" class="form-error"></div>
+              </div>
+
+              <!-- Row 2: City, State, Pincode -->
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+                <div class="form-group">
+                  <label class="form-label" for="editPropCity">City <span class="required">*</span></label>
+                  <input 
+                    type="text" 
+                    id="editPropCity" 
+                    class="form-control" 
+                    required
+                  >
+                  <div id="editPropCityError" class="form-error"></div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="editPropState">State <span class="required">*</span></label>
+                  <input 
+                    type="text" 
+                    id="editPropState" 
+                    class="form-control" 
+                    required
+                  >
+                  <div id="editPropStateError" class="form-error"></div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="editPropPincode">PIN Code <span class="required">*</span></label>
+                  <input 
+                    type="text" 
+                    id="editPropPincode" 
+                    class="form-control" 
+                    maxlength="6"
+                    required
+                  >
+                  <div id="editPropPincodeError" class="form-error"></div>
+                </div>
+              </div>
+
+              <!-- Row 3: Total Rooms and Monthly Rent -->
+              <div class="form-row-2">
+                <div class="form-group">
+                  <label class="form-label" for="editPropTotalRooms">Total Rooms / Units <span class="required">*</span></label>
+                  <input 
+                    type="number" 
+                    id="editPropTotalRooms" 
+                    class="form-control" 
+                    min="1"
+                    required
+                  >
+                  <div id="editPropRoomsError" class="form-error"></div>
+                  <div class="form-hint">Updating total rooms modifies inventory capacity.</div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label" for="editPropRent">Monthly Rent (₹) <span class="required">*</span></label>
+                  <input 
+                    type="number" 
+                    id="editPropRent" 
+                    class="form-control" 
+                    min="0"
+                    step="100"
+                    required
+                  >
+                  <div id="editPropRentError" class="form-error"></div>
+                  <div class="form-hint">Standard monthly rental amount billed to tenants.</div>
+                </div>
+              </div>
+
+              <!-- Description -->
+              <div class="form-group">
+                <label class="form-label" for="editPropDescription">Property Description & Amenities</label>
+                <textarea 
+                  id="editPropDescription" 
+                  class="form-textarea" 
+                  rows="3"
+                ></textarea>
+              </div>
+
+              <!-- Form Buttons -->
+              <div class="form-actions-bar">
+                <a href="properties.html" class="btn btn-outline">
+                  Cancel
+                </a>
+                <button type="submit" class="btn btn-primary btn-lg">
+                  💾 Update Property
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+
+      </main>
+
+    </div>
+
+  </div>
+
+  <script src="properties.js"></script>
+</body>
+</html>

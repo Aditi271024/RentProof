@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentProof - Property Management</title>
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="../shared/sidebar.css">
+  <link rel="stylesheet" href="properties.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ==========================================
+         COLLAPSIBLE LEFT SIDEBAR (Midnight Blue)
+         ========================================== -->
+    <aside class="sidebar" id="appSidebar">
+      
+      <!-- Brand Logo / Header -->
+      <div class="sidebar-header">
+        <a href="properties.html" class="brand-link">
+          <div class="brand-logo-icon">RP</div>
+          <span class="brand-name">Rent<span>Proof</span></span>
+        </a>
+      </div>
+
+      <!-- Navigation Menu Items -->
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Portal</div>
+        
+        <a href="properties.html" class="nav-item active" data-tooltip="Properties">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-label">Properties</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Dashboard" onclick="showModuleNotice('Dashboard Overview', 'Aditi Sharma')">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <div class="nav-section-title">Team Modules</div>
+
+        <!-- Shweta's Module Link -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Tenants (Shweta)" onclick="showModuleNotice('Tenants Management', 'Shweta')">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Tenants</span>
+        </a>
+
+        <!-- Aanvi's Module Link -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Payments (Aanvi)" onclick="showModuleNotice('Rent & Payments', 'Aanvi')">
+          <span class="nav-icon">💳</span>
+          <span class="nav-label">Rent & Payments</span>
+        </a>
+
+        <!-- Gungun's Module Link -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reminders (Gungun)" onclick="showModuleNotice('Reminders & Alerts', 'Gungun')">
+          <span class="nav-icon">🔔</span>
+          <span class="nav-label">Reminders</span>
+        </a>
+
+        <div class="nav-section-title">System</div>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports" onclick="alert('Reports module will generate rental revenue and occupancy statements.')">
+          <span class="nav-icon">📈</span>
+          <span class="nav-label">Reports</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings" onclick="alert('Settings module: Manage landlord profile and account preferences.')">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Footer / Logout -->
+      <div class="sidebar-footer">
+        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Logout">
+          <span class="nav-icon">🚪</span>
+          <span class="logout-text">Sign Out</span>
+        </a>
+      </div>
+
+    </aside>
+
+    <!-- ==========================================
+         MAIN CONTENT AREA
+         ========================================== -->
+    <div class="main-wrapper">
+
+      <!-- TOP NAVBAR -->
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Navigation Sidebar">
+            ☰
+          </button>
+          
+          <div class="nav-search-bar">
+            <span class="nav-search-icon">🔍</span>
+            <input 
+              type="text" 
+              class="nav-search-input" 
+              id="propertySearchInput" 
+              placeholder="Search properties by name, city, address..."
+            >
+          </div>
+        </div>
+
+        <div class="navbar-right">
+          <button class="notification-btn" title="System Notifications" onclick="alert('No unread notifications at this time.')">
+            🔔
+            <span class="notification-badge"></span>
+          </button>
+
+          <!-- Landlord Profile Pill -->
+          <div class="landlord-profile-pill" onclick="alert('Logged in Landlord: Aditi Sharma\nRole: Property Administrator\nModule: Database, Auth & Properties')">
+            <div class="profile-avatar" id="landlordAvatarInitials">AS</div>
+            <div class="profile-details">
+              <span class="profile-name" id="landlordDisplayName">Aditi Sharma</span>
+              <span class="profile-role">Landlord &bull; Active</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- PAGE CONTENT CANVAS (Ivory) -->
+      <main class="page-content">
+
+        <!-- Title & Primary Action Header -->
+        <div class="page-header-bar">
+          <div class="page-title-block">
+            <h1>Property Management</h1>
+            <p>Monitor your buildings, manage rooms, and track real-time occupancy rates.</p>
+          </div>
+          <a href="add-property.html" class="btn btn-primary btn-lg">
+            ➕ Add New Property
+          </a>
+        </div>
+
+        <!-- 4 Summary Stats Cards -->
+        <section class="stats-grid">
+          
+          <div class="stat-card">
+            <div class="stat-icon">🏢</div>
+            <div class="stat-content">
+              <span class="stat-value" id="statTotalProperties">0</span>
+              <span class="stat-label">Total Properties</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon">🚪</div>
+            <div class="stat-content">
+              <span class="stat-value" id="statTotalRooms">0</span>
+              <span class="stat-label">Total Rooms</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon" style="color: var(--success); border-color: var(--success-border); background-color: var(--success-bg);">👥</div>
+            <div class="stat-content">
+              <span class="stat-value" id="statOccupiedRooms" style="color: var(--success);">0</span>
+              <span class="stat-label">Occupied Rooms</span>
+            </div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-icon" style="color: var(--warning); border-color: var(--warning-border); background-color: var(--warning-bg);">🔑</div>
+            <div class="stat-content">
+              <span class="stat-value" id="statVacantRooms" style="color: var(--warning);">0</span>
+              <span class="stat-label">Vacant Rooms</span>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- Filter & Search Toolbar -->
+        <section class="toolbar-card">
+          <div class="toolbar-left">
+            <span style="font-size: 0.875rem; font-weight: 600; color: var(--navy);">Filter By Type:</span>
+            <select class="filter-select" id="propertyTypeFilter">
+              <option value="ALL">All Property Types</option>
+              <option value="PG">PG (Paying Guest)</option>
+              <option value="Flat">Flat / Apartment</option>
+              <option value="Apartment">Luxury Apartment</option>
+              <option value="House">Independent House / Villa</option>
+            </select>
+          </div>
+
+          <div class="toolbar-right">
+            <span style="font-size: 0.825rem; color: var(--slate-muted);">
+              Data Source: <strong>MySQL `rentproof` &bull; InnoDB</strong>
+            </span>
+          </div>
+        </section>
+
+        <!-- Properties Grid Display -->
+        <section class="properties-grid" id="propertiesGrid">
+          <!-- Dynamically populated via properties.js -->
+        </section>
+
+        <!-- Empty State (Shown when no properties match filters) -->
+        <div class="empty-state-box" id="emptyStateBox" style="display: none;">
+          <div class="empty-state-icon">🏢</div>
+          <h3 class="empty-state-title">No Properties Found</h3>
+          <p class="empty-state-desc">
+            No properties matched your search criteria or type filter. Try adjusting your search query or add a new property.
+          </p>
+          <a href="add-property.html" class="btn btn-primary">
+            ➕ Add Your First Property
+          </a>
+        </div>
+
+      </main>
+
+    </div>
+
+  </div>
+
+  <!-- ==========================================
+       MODAL 1: VIEW PROPERTY DETAILS
+       ========================================== -->
+  <div class="modal-overlay" id="propertyDetailsModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Property Overview</h3>
+        <button class="modal-close-btn" onclick="closeDetailsModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="detailsModalBody">
+        <!-- Injected via properties.js -->
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-sm" onclick="closeDetailsModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL 2: CONFIRM DELETE
+       ========================================== -->
+  <div class="modal-overlay" id="deleteConfirmModal">
+    <div class="modal-box" style="max-width: 440px;">
+      <div class="modal-header" style="background-color: var(--danger-bg); border-bottom-color: var(--danger-border);">
+        <h3 style="color: var(--danger);">Confirm Property Deletion</h3>
+        <button class="modal-close-btn" onclick="closeDeleteModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 12px;">
+          Are you sure you want to delete <strong id="deletePropertyNameTarget">this property</strong>?
+        </p>
+        <div style="font-size: 0.85rem; color: var(--danger); background-color: var(--danger-bg); padding: 10px; border-radius: 6px; border: 1px solid var(--danger-border);">
+          ⚠️ <strong>Referential Integrity Protection:</strong><br>
+          In our MySQL schema, properties cannot be deleted if active rooms, tenants, or rental records are attached (<code>ON DELETE RESTRICT</code>).
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-sm" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn btn-danger btn-sm" onclick="confirmExecuteDelete()">Confirm Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="properties.js"></script>
+</body>
+</html>
