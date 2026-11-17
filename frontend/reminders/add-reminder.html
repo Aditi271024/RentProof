@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentProof - Create Reminder</title>
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="../shared/sidebar.css">
+  <link rel="stylesheet" href="reminders.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ==========================================
+         COLLAPSIBLE LEFT SIDEBAR
+         ========================================== -->
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <a href="../properties/properties.html" class="brand-link">
+          <div class="brand-logo-icon">RP</div>
+          <span class="brand-name">Rent<span>Proof</span></span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Portal</div>
+        
+        <a href="../properties/properties.html" class="nav-item" data-tooltip="Properties">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-label">Properties</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Dashboard" onclick="showModuleNotice('Dashboard Overview', 'Aditi Sharma')">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <div class="nav-section-title">Team Modules</div>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Tenants (Shweta)" onclick="showModuleNotice('Tenants Management', 'Shweta')">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Tenants</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Payments (Aanvi)" onclick="showModuleNotice('Rent & Payments', 'Aanvi')">
+          <span class="nav-icon">💳</span>
+          <span class="nav-label">Rent &amp; Payments</span>
+        </a>
+
+        <a href="reminders.html" class="nav-item active" data-tooltip="Reminders (Gungun)">
+          <span class="nav-icon">🔔</span>
+          <span class="nav-label">Reminders</span>
+        </a>
+
+        <div class="nav-section-title">System</div>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports" onclick="alert('Reports module.')">
+          <span class="nav-icon">📈</span>
+          <span class="nav-label">Reports</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings" onclick="alert('Settings module.')">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a href="../auth/login.html" class="logout-btn" id="logoutBtn" data-tooltip="Logout">
+          <span class="nav-icon">🚪</span>
+          <span class="logout-text">Sign Out</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- ==========================================
+         MAIN CONTENT AREA
+         ========================================== -->
+    <div class="main-wrapper">
+
+      <!-- TOP NAVBAR -->
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Navigation Sidebar">
+            ☰
+          </button>
+          <div style="font-size: 0.95rem; font-weight: 600; color: var(--navy);">
+            Reminders &gt; Create New Reminder
+          </div>
+        </div>
+
+        <div class="navbar-right">
+          <button class="notification-btn" title="System Notifications">
+            🔔
+            <span class="notification-badge"></span>
+          </button>
+
+          <div class="landlord-profile-pill">
+            <div class="profile-avatar" id="landlordAvatarInitials">AS</div>
+            <div class="profile-details">
+              <span class="profile-name" id="landlordDisplayName">Aditi Sharma</span>
+              <span class="profile-role">Landlord &bull; Active</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- PAGE CONTENT CANVAS -->
+      <main class="page-content">
+
+        <div class="page-header-bar">
+          <div class="page-title-block">
+            <h1>Create Rent Reminder</h1>
+            <p>Schedule a payment reminder, upcoming due date notice, or property maintenance task.</p>
+          </div>
+          <a href="reminders.html" class="btn btn-outline">
+            &larr; Back to Reminders
+          </a>
+        </div>
+
+        <!-- Reminder Entry Form Card -->
+        <div class="reminder-form-card">
+          <div class="card-header">
+            <h3>Reminder Specifications</h3>
+            <span style="font-size: 0.8rem; color: var(--slate-muted);">Fields marked with <span style="color: var(--danger);">*</span> are mandatory</span>
+          </div>
+
+          <div class="card-body">
+            <form id="addReminderForm" novalidate>
+
+              <!-- Field 1: Recipient Tenant -->
+              <div class="form-group">
+                <label class="form-label" for="reminderTenantSelect">Select Tenant <span class="required">*</span></label>
+                <select id="reminderTenantSelect" class="form-select" required>
+                  <!-- Dynamically populated from database / localStorage -->
+                </select>
+                <div id="reminderTenantError" class="form-error"></div>
+                <div class="form-hint">
+                  Tenants are dynamically retrieved from the MySQL database. Select 'Property-wide' for general building maintenance.
+                </div>
+              </div>
+
+              <!-- Field 2: Reminder Type & Due Date Row -->
+              <div class="form-row-2">
+                
+                <!-- Reminder Type -->
+                <div class="form-group">
+                  <label class="form-label" for="reminderType">Reminder Type <span class="required">*</span></label>
+                  <select id="reminderType" class="form-select" required>
+                    <option value="">-- Select Reminder Type --</option>
+                    <option value="Rent Due" selected>💵 Rent Due</option>
+                    <option value="Maintenance">🔧 Maintenance &amp; Repairs</option>
+                    <option value="General">📌 General Announcement</option>
+                    <option value="Agreement Expiry">📑 Agreement Expiry</option>
+                  </select>
+                  <div id="reminderTypeError" class="form-error"></div>
+                </div>
+
+                <!-- Due Date -->
+                <div class="form-group">
+                  <label class="form-label" for="reminderDueDate">Due Date <span class="required">*</span></label>
+                  <input 
+                    type="date" 
+                    id="reminderDueDate" 
+                    class="form-control" 
+                    required
+                  >
+                  <div id="reminderDueDateError" class="form-error"></div>
+                  <!-- Quick Date Buttons -->
+                  <div class="date-quick-buttons">
+                    <span style="font-size: 0.72rem; color: var(--slate-muted); align-self: center;">Quick set:</span>
+                    <button type="button" class="date-btn" data-offset-days="1">Tomorrow</button>
+                    <button type="button" class="date-btn" data-offset-days="3">In 3 Days</button>
+                    <button type="button" class="date-btn" data-offset-days="7">In 1 Week</button>
+                    <button type="button" class="date-btn" data-first-next-month="true">1st of Next Month</button>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Field 3: Title -->
+              <div class="form-group">
+                <label class="form-label" for="reminderTitle">Reminder Title <span class="required">*</span></label>
+                <input 
+                  type="text" 
+                  id="reminderTitle" 
+                  class="form-control" 
+                  placeholder="e.g. Monthly Rent Due Notice - December 2026"
+                  maxlength="150"
+                  required
+                >
+                <div id="reminderTitleError" class="form-error"></div>
+
+                <!-- Quick Template Chips -->
+                <div class="quick-templates-box">
+                  <span style="font-size: 0.75rem; color: var(--slate-muted); font-weight: 600;">Templates:</span>
+                  <button 
+                    type="button" 
+                    class="template-chip" 
+                    data-title="Upcoming Monthly Rent Due" 
+                    data-type="Rent Due"
+                    data-message="Dear {TENANT_NAME}, friendly reminder that your monthly rent for {ROOM} is due on the scheduled date. Kindly process via UPI or Bank Transfer."
+                  >
+                    + Monthly Rent Due
+                  </button>
+                  <button 
+                    type="button" 
+                    class="template-chip" 
+                    data-title="Overdue Rent Settle Request" 
+                    data-type="Rent Due"
+                    data-message="Dear {TENANT_NAME}, our records show that your monthly rental is currently overdue. Please clear the outstanding balance at your earliest convenience."
+                  >
+                    + Overdue Rent Notice
+                  </button>
+                  <button 
+                    type="button" 
+                    class="template-chip" 
+                    data-title="Quarterly AC & Filter Maintenance" 
+                    data-type="Maintenance"
+                    data-message="Building maintenance notice: Scheduled AC servicing, coil cleaning, and power check for all rooms this weekend."
+                  >
+                    + AC Maintenance
+                  </button>
+                  <button 
+                    type="button" 
+                    class="template-chip" 
+                    data-title="Water Tank Cleaning & Supply Notice" 
+                    data-type="General"
+                    data-message="Notice to all residents: Overhead water tank cleaning will take place between 10:00 AM and 2:00 PM. Please store sufficient water."
+                  >
+                    + Water Tank Notice
+                  </button>
+                </div>
+              </div>
+
+              <!-- Field 4: Status -->
+              <div class="form-group">
+                <label class="form-label">Initial Reminder Status <span class="required">*</span></label>
+                <div class="radio-cards-group">
+                  <label class="radio-card-label">
+                    <input type="radio" name="reminderStatus" value="Pending" checked>
+                    <div class="radio-card-box">
+                      ⏳ Pending Action
+                    </div>
+                  </label>
+                  <label class="radio-card-label">
+                    <input type="radio" name="reminderStatus" value="Completed">
+                    <div class="radio-card-box">
+                      ✅ Already Settled / Completed
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Field 5: Message -->
+              <div class="form-group">
+                <label class="form-label" for="reminderMessage">Reminder Message Details <span class="required">*</span></label>
+                <textarea 
+                  id="reminderMessage" 
+                  class="form-textarea" 
+                  placeholder="Enter the detailed reminder instructions, payment amount, or maintenance guidelines..."
+                  required
+                ></textarea>
+                <div id="reminderMessageError" class="form-error"></div>
+                <div class="form-hint">
+                  Include payment instructions, due amounts, or specific timings for maintenance visits.
+                </div>
+              </div>
+
+              <!-- Form Actions Bar -->
+              <div class="form-actions-bar">
+                <a href="reminders.html" class="btn btn-outline">Cancel</a>
+                <button type="submit" class="btn btn-primary btn-lg" id="submitReminderBtn">
+                  💾 Save &amp; Schedule Reminder
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+
+      </main>
+
+    </div>
+
+  </div>
+
+  <script src="reminders.js"></script>
+</body>
+</html>
