@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentProof - Landlord Dashboard</title>
+  <!-- Shared Design System CSS -->
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="../shared/sidebar.css">
+  <!-- Dashboard Specific Styles -->
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ==========================================
+         COLLAPSIBLE LEFT SIDEBAR (Midnight Blue)
+         ========================================== -->
+    <aside class="sidebar" id="appSidebar">
+      
+      <!-- Brand Logo / Header -->
+      <div class="sidebar-header">
+        <a href="dashboard.html" class="brand-link">
+          <div class="brand-logo-icon">RP</div>
+          <span class="brand-name">Rent<span>Proof</span></span>
+        </a>
+      </div>
+
+      <!-- Navigation Menu Items -->
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Portal</div>
+        
+        <!-- Active Dashboard Navigation -->
+        <a href="dashboard.html" class="nav-item active" data-tooltip="Dashboard">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <!-- Properties Link -->
+        <a href="../properties/properties.html" class="nav-item" data-tooltip="Properties">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-label">Properties</span>
+        </a>
+
+        <div class="nav-section-title">Team Modules</div>
+
+        <!-- Shweta's Tenants Module -->
+        <a href="../tenants/tenants.html" class="nav-item" data-tooltip="Tenants (Shweta)">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Tenants</span>
+        </a>
+
+        <!-- Aanvi's Payments Module -->
+        <a href="../payments/payments.html" class="nav-item" data-tooltip="Payments (Aanvi)">
+          <span class="nav-icon">💳</span>
+          <span class="nav-label">Rent & Payments</span>
+        </a>
+
+        <!-- Gungun's Reminders Module -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reminders (Gungun)" onclick="showModuleNotice('Reminders & Alerts', 'Gungun')">
+          <span class="nav-icon">🔔</span>
+          <span class="nav-label">Reminders</span>
+        </a>
+
+        <div class="nav-section-title">System</div>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports" onclick="alert('Reports module: Generates occupancy reports and rental statements.')">
+          <span class="nav-icon">📈</span>
+          <span class="nav-label">Reports</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings" onclick="alert('Settings module: Manage landlord profile and account preferences.')">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Footer / Logout -->
+      <div class="sidebar-footer">
+        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Logout">
+          <span class="nav-icon">🚪</span>
+          <span class="logout-text">Sign Out</span>
+        </a>
+      </div>
+
+    </aside>
+
+    <!-- ==========================================
+         MAIN CONTENT CANVAS (Ivory Background)
+         ========================================== -->
+    <div class="main-wrapper">
+
+      <!-- TOP NAVBAR -->
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Navigation Sidebar">
+            ☰
+          </button>
+          <div class="nav-search-bar">
+            <span class="nav-search-icon">🔍</span>
+            <input 
+              type="text" 
+              class="nav-search-input" 
+              placeholder="Search properties, rooms, or tenants..."
+              oninput="if(event.key === 'Enter'){window.location.href='../properties/properties.html';}"
+            >
+          </div>
+        </div>
+
+        <div class="navbar-right">
+          <button class="notification-btn" title="System Notifications" onclick="alert('System Notice: All property room records and rental ledgers are up to date.')">
+            🔔
+            <span class="notification-badge"></span>
+          </button>
+
+          <!-- Landlord Profile Pill -->
+          <div class="landlord-profile-pill" onclick="alert('Logged in Landlord: Aditi Sharma\nRole: Property Administrator\nBranch: aditi')">
+            <div class="profile-avatar" id="headerAvatarInitials">AS</div>
+            <div class="profile-details">
+              <span class="profile-name" id="headerLandlordName">Aditi Sharma</span>
+              <span class="profile-role">Landlord Admin</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- MAIN DASHBOARD CONTENT -->
+      <main class="main-content">
+        <div class="dashboard-content">
+
+          <!-- ==========================================
+               SECTION A: WELCOME SECTION
+               ========================================== -->
+          <section class="welcome-banner">
+            <div class="welcome-text">
+              <h1>Welcome back, <span id="welcomeLandlordName">Aditi Sharma</span>!</h1>
+              <p>Here is your rental portfolio summary, room occupancy breakdown, and payment status overview across your registered properties.</p>
+            </div>
+            <div class="welcome-meta">
+              <div class="date-badge">
+                <span>📅</span>
+                <span id="currentDateDisplay">Loading date...</span>
+              </div>
+              <div class="system-status-indicator">
+                <span class="status-dot"></span>
+                <span id="connectionModeText">Checking database connection...</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- ==========================================
+               SECTION G: QUICK ACTIONS
+               ========================================== -->
+          <section class="quick-actions-bar">
+            <div class="quick-actions-title">
+              <span>⚡</span> Quick Management Actions
+            </div>
+            <div class="action-buttons-group">
+              <a href="../properties/add-property.html" class="btn-action btn-action-primary">
+                ➕ Add Property
+              </a>
+              <a href="../tenants/add-tenant.html" class="btn-action btn-action-outline">
+                👤 Add Tenant
+              </a>
+              <a href="../payments/add-payment.html" class="btn-action btn-action-outline">
+                💳 Record Payment
+              </a>
+              <button class="btn-action btn-action-outline" onclick="alert('Create Reminder: Quick-add dialogue for tenant rent notifications and maintenance inspections.')">
+                🔔 Create Reminder
+              </button>
+            </div>
+          </section>
+
+          <!-- ==========================================
+               SECTION B: OVERVIEW STATISTICS (6 CARDS)
+               ========================================== -->
+          <section class="stats-grid">
+            
+            <!-- Card 1: Total Properties -->
+            <div class="stat-card primary">
+              <div class="stat-card-header">
+                <div class="stat-icon">🏢</div>
+              </div>
+              <div class="stat-value" id="statTotalProperties">0</div>
+              <div class="stat-label">Total Properties</div>
+            </div>
+
+            <!-- Card 2: Total Rooms -->
+            <div class="stat-card info">
+              <div class="stat-card-header">
+                <div class="stat-icon">🚪</div>
+              </div>
+              <div class="stat-value" id="statTotalRooms">0</div>
+              <div class="stat-label">Total Rooms</div>
+            </div>
+
+            <!-- Card 3: Occupied Rooms -->
+            <div class="stat-card success">
+              <div class="stat-card-header">
+                <div class="stat-icon">🟢</div>
+              </div>
+              <div class="stat-value" id="statOccupiedRooms" style="color: var(--success);">0</div>
+              <div class="stat-label">Occupied Rooms</div>
+            </div>
+
+            <!-- Card 4: Total Tenants -->
+            <div class="stat-card primary">
+              <div class="stat-card-header">
+                <div class="stat-icon">👥</div>
+              </div>
+              <div class="stat-value" id="statTotalTenants">0</div>
+              <div class="stat-label">Total Tenants</div>
+            </div>
+
+            <!-- Card 5: Rent Collected -->
+            <div class="stat-card success">
+              <div class="stat-card-header">
+                <div class="stat-icon">💰</div>
+              </div>
+              <div class="stat-value" id="statRentCollected" style="color: var(--success);">₹0.00</div>
+              <div class="stat-label">Rent Collected</div>
+            </div>
+
+            <!-- Card 6: Pending Rent -->
+            <div class="stat-card warning">
+              <div class="stat-card-header">
+                <div class="stat-icon">⏳</div>
+              </div>
+              <div class="stat-value" id="statPendingRent" style="color: var(--warning);">₹0.00</div>
+              <div class="stat-label">Pending Rent</div>
+            </div>
+
+          </section>
+
+          <!-- ==========================================
+               SECTION C: PROPERTY OVERVIEW
+               ========================================== -->
+          <section class="full-width-section">
+            <div class="dashboard-card">
+              <div class="card-header">
+                <h3><span>🏢</span> Property Portfolio & Room Occupancy</h3>
+                <a href="../properties/properties.html" class="card-header-link">View All Properties →</a>
+              </div>
+              <div class="card-body">
+                <div style="overflow-x: auto;">
+                  <table class="dashboard-table">
+                    <thead>
+                      <tr>
+                        <th>Property Name & Type</th>
+                        <th>Location</th>
+                        <th>Total Rooms</th>
+                        <th>Occupancy Breakdown</th>
+                        <th>Action</th>
+                      </tr>
+                    </thead>
+                    <tbody id="propertiesTableBody">
+                      <!-- Populated dynamically by dashboard.js -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ==========================================
+               SECTIONS D & E: RECENT PAYMENTS & PENDING RENT
+               ========================================== -->
+          <div class="dashboard-grid-layout">
+            
+            <!-- SECTION D: Recent Payments -->
+            <div class="dashboard-card">
+              <div class="card-header">
+                <h3><span>💳</span> Recent Rent Payments</h3>
+                <a href="../payments/payments.html" class="card-header-link">View All Payments →</a>
+              </div>
+              <div class="card-body">
+                <div style="overflow-x: auto;">
+                  <table class="dashboard-table">
+                    <thead>
+                      <tr>
+                        <th>Tenant</th>
+                        <th>Property</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="recentPaymentsBody">
+                      <!-- Populated dynamically by dashboard.js -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- SECTION E: Pending Rent -->
+            <div class="dashboard-card">
+              <div class="card-header">
+                <h3><span>⏳</span> Outstanding & Pending Rent</h3>
+                <a href="../payments/payment-history.html" class="card-header-link">Payment History →</a>
+              </div>
+              <div class="card-body">
+                <div style="overflow-x: auto;">
+                  <table class="dashboard-table">
+                    <thead>
+                      <tr>
+                        <th>Tenant</th>
+                        <th>Property</th>
+                        <th>Pending Amount</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody id="pendingRentBody">
+                      <!-- Populated dynamically by dashboard.js -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- ==========================================
+               SECTION F: UPCOMING REMINDERS
+               ========================================== -->
+          <section class="full-width-section">
+            <div class="dashboard-card">
+              <div class="card-header">
+                <h3><span>🔔</span> Upcoming Action Reminders</h3>
+                <a href="javascript:void(0)" class="card-header-link" onclick="showModuleNotice('Reminders Module', 'Gungun')">View All Reminders →</a>
+              </div>
+              <div class="card-body">
+                <div id="remindersListContainer">
+                  <!-- Populated dynamically by dashboard.js -->
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </main>
+
+    </div>
+
+  </div>
+
+  <!-- Dashboard Controller JavaScript -->
+  <script src="dashboard.js"></script>
+</body>
+</html>

@@ -116,7 +116,7 @@ function setupLoginForm() {
     );
 
     if (matchedUser) {
-      showAlert("loginAlert", "Login successful! Redirecting to Properties Dashboard...", "success");
+      showAlert("loginAlert", "Login successful! Redirecting to Landlord Dashboard...", "success");
 
       // Save active session
       localStorage.setItem("rentproof_user", JSON.stringify({
@@ -127,7 +127,7 @@ function setupLoginForm() {
       }));
 
       setTimeout(() => {
-        window.location.href = "../properties/properties.html";
+        window.location.href = "../dashboard/dashboard.html";
       }, 900);
     } else {
       showAlert(
