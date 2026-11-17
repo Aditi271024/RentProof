@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentProof - Edit Reminder</title>
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="../shared/sidebar.css">
+  <link rel="stylesheet" href="reminders.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ==========================================
+         COLLAPSIBLE LEFT SIDEBAR
+         ========================================== -->
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <a href="../properties/properties.html" class="brand-link">
+          <div class="brand-logo-icon">RP</div>
+          <span class="brand-name">Rent<span>Proof</span></span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Portal</div>
+        
+        <a href="../properties/properties.html" class="nav-item" data-tooltip="Properties">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-label">Properties</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Dashboard" onclick="showModuleNotice('Dashboard Overview', 'Aditi Sharma')">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <div class="nav-section-title">Team Modules</div>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Tenants (Shweta)" onclick="showModuleNotice('Tenants Management', 'Shweta')">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Tenants</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Payments (Aanvi)" onclick="showModuleNotice('Rent & Payments', 'Aanvi')">
+          <span class="nav-icon">💳</span>
+          <span class="nav-label">Rent &amp; Payments</span>
+        </a>
+
+        <a href="reminders.html" class="nav-item active" data-tooltip="Reminders (Gungun)">
+          <span class="nav-icon">🔔</span>
+          <span class="nav-label">Reminders</span>
+        </a>
+
+        <div class="nav-section-title">System</div>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports" onclick="alert('Reports module.')">
+          <span class="nav-icon">📈</span>
+          <span class="nav-label">Reports</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings" onclick="alert('Settings module.')">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a href="../auth/login.html" class="logout-btn" id="logoutBtn" data-tooltip="Logout">
+          <span class="nav-icon">🚪</span>
+          <span class="logout-text">Sign Out</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- ==========================================
+         MAIN CONTENT AREA
+         ========================================== -->
+    <div class="main-wrapper">
+
+      <!-- TOP NAVBAR -->
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Navigation Sidebar">
+            ☰
+          </button>
+          <div style="font-size: 0.95rem; font-weight: 600; color: var(--navy);">
+            Reminders &gt; Edit Reminder
+          </div>
+        </div>
+
+        <div class="navbar-right">
+          <button class="notification-btn" title="System Notifications">
+            🔔
+            <span class="notification-badge"></span>
+          </button>
+
+          <div class="landlord-profile-pill">
+            <div class="profile-avatar" id="landlordAvatarInitials">AS</div>
+            <div class="profile-details">
+              <span class="profile-name" id="landlordDisplayName">Aditi Sharma</span>
+              <span class="profile-role">Landlord &bull; Active</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- PAGE CONTENT CANVAS -->
+      <main class="page-content">
+
+        <div class="page-header-bar">
+          <div class="page-title-block">
+            <h1>Edit Reminder Details</h1>
+            <p>Modify reminder instructions, change scheduled due dates, or update status.</p>
+          </div>
+          <a href="reminders.html" class="btn btn-outline">
+            &larr; Back to Reminders
+          </a>
+        </div>
+
+        <!-- Reminder Edit Form Card -->
+        <div class="reminder-form-card">
+          <div class="card-header">
+            <h3>Editing Reminder <span id="editReminderIdDisplay" style="color: var(--steel-blue);">#REM</span></h3>
+            <span style="font-size: 0.8rem; color: var(--slate-muted);">Fields marked with <span style="color: var(--danger);">*</span> are mandatory</span>
+          </div>
+
+          <div class="card-body">
+            <form id="editReminderForm" novalidate>
+
+              <!-- Field 1: Recipient Tenant -->
+              <div class="form-group">
+                <label class="form-label" for="editReminderTenantSelect">Recipient Tenant <span class="required">*</span></label>
+                <select id="editReminderTenantSelect" class="form-select" required>
+                  <!-- Populated dynamically via reminders.js -->
+                </select>
+                <div id="editReminderTenantError" class="form-error"></div>
+              </div>
+
+              <!-- Field 2: Reminder Type & Due Date Row -->
+              <div class="form-row-2">
+                
+                <!-- Reminder Type -->
+                <div class="form-group">
+                  <label class="form-label" for="editReminderType">Reminder Type <span class="required">*</span></label>
+                  <select id="editReminderType" class="form-select" required>
+                    <option value="Rent Due">💵 Rent Due</option>
+                    <option value="Maintenance">🔧 Maintenance &amp; Repairs</option>
+                    <option value="General">📌 General Announcement</option>
+                    <option value="Agreement Expiry">📑 Agreement Expiry</option>
+                  </select>
+                  <div id="editReminderTypeError" class="form-error"></div>
+                </div>
+
+                <!-- Due Date -->
+                <div class="form-group">
+                  <label class="form-label" for="editReminderDueDate">Due Date <span class="required">*</span></label>
+                  <input 
+                    type="date" 
+                    id="editReminderDueDate" 
+                    class="form-control" 
+                    required
+                  >
+                  <div id="editReminderDueDateError" class="form-error"></div>
+                  <!-- Quick Date Buttons -->
+                  <div class="date-quick-buttons">
+                    <span style="font-size: 0.72rem; color: var(--slate-muted); align-self: center;">Quick set:</span>
+                    <button type="button" class="date-btn" data-offset-days="1">Tomorrow</button>
+                    <button type="button" class="date-btn" data-offset-days="3">In 3 Days</button>
+                    <button type="button" class="date-btn" data-offset-days="7">In 1 Week</button>
+                    <button type="button" class="date-btn" data-first-next-month="true">1st of Next Month</button>
+                  </div>
+                </div>
+
+              </div>
+
+              <!-- Field 3: Title -->
+              <div class="form-group">
+                <label class="form-label" for="editReminderTitle">Reminder Title <span class="required">*</span></label>
+                <input 
+                  type="text" 
+                  id="editReminderTitle" 
+                  class="form-control" 
+                  maxlength="150"
+                  required
+                >
+                <div id="editReminderTitleError" class="form-error"></div>
+              </div>
+
+              <!-- Field 4: Status -->
+              <div class="form-group">
+                <label class="form-label">Reminder Status <span class="required">*</span></label>
+                <div class="radio-cards-group">
+                  <label class="radio-card-label">
+                    <input type="radio" name="editReminderStatus" value="Pending">
+                    <div class="radio-card-box">
+                      ⏳ Pending
+                    </div>
+                  </label>
+                  <label class="radio-card-label">
+                    <input type="radio" name="editReminderStatus" value="Sent">
+                    <div class="radio-card-box">
+                      📤 Notice Sent
+                    </div>
+                  </label>
+                  <label class="radio-card-label">
+                    <input type="radio" name="editReminderStatus" value="Completed">
+                    <div class="radio-card-box">
+                      ✅ Completed
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Field 5: Message -->
+              <div class="form-group">
+                <label class="form-label" for="editReminderMessage">Reminder Message <span class="required">*</span></label>
+                <textarea 
+                  id="editReminderMessage" 
+                  class="form-textarea" 
+                  required
+                ></textarea>
+                <div id="editReminderMessageError" class="form-error"></div>
+              </div>
+
+              <!-- Form Actions Bar -->
+              <div class="form-actions-bar">
+                <a href="reminders.html" class="btn btn-outline">Cancel</a>
+                <button type="submit" class="btn btn-primary btn-lg" id="updateReminderBtn">
+                  💾 Update Reminder
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+
+      </main>
+
+    </div>
+
+  </div>
+
+  <script src="reminders.js"></script>
+</body>
+</html>
