@@ -591,37 +591,37 @@ function renderTenantsTable(tenants) {
     const statusClass = getStatusClass(t.tenantStatus);
 
     tr.innerHTML = `
-      <td><span class="tenant-id-badge">#TN-${String(t.tenantId).padStart(3, '0')}</span></td>
-      <td>
+      <td data-label="Tenant ID"><span class="tenant-id-badge">#TN-${String(t.tenantId).padStart(3, '0')}</span></td>
+      <td data-label="Tenant Name">
         <div class="tenant-name-cell">
           <div class="tenant-avatar">${initials}</div>
           <div class="tenant-name-text">${escapeHtml(t.fullName)}</div>
         </div>
       </td>
-      <td>
+      <td data-label="Phone / Email">
         <div class="tenant-contact-cell">
           <span class="contact-phone">📞 ${escapeHtml(t.phone)}</span>
           <span class="contact-email">✉️ ${escapeHtml(t.email)}</span>
         </div>
       </td>
-      <td>
-        <span style="font-weight: 500; color: var(--navy);">${escapeHtml(t.propertyName || 'Unassigned')}</span>
+      <td data-label="Property Name">
+        <span class="tenant-property-cell">${escapeHtml(t.propertyName || 'Unassigned')}</span>
       </td>
-      <td>
+      <td data-label="Room Number">
         <span class="property-room-pill">
           🚪 <span class="room-badge">${escapeHtml(t.roomNumber || 'N/A')}</span>
         </span>
       </td>
-      <td>
+      <td data-label="Monthly Rent">
         <span class="rent-amount">₹${Number(t.monthlyRent || 0).toLocaleString('en-IN')}<small>/mo</small></span>
       </td>
-      <td>
-        <span style="font-size: 0.85rem; color: var(--slate);">${formatDisplayDate(t.moveInDate)}</span>
+      <td data-label="Joining Date">
+        <span class="tenant-date-cell">${formatDisplayDate(t.moveInDate)}</span>
       </td>
-      <td>
+      <td data-label="Status">
         <span class="status-pill ${statusClass}">${escapeHtml(t.tenantStatus || 'Active')}</span>
       </td>
-      <td>
+      <td data-label="Actions">
         <div class="table-actions">
           <button class="btn-action action-view" title="View Full Details" onclick="openViewTenantModal(${t.tenantId})">
             👁️
