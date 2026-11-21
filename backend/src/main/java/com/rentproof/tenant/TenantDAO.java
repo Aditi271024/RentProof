@@ -35,8 +35,8 @@ public class TenantDAO {
      */
     public int addTenant(Tenant tenant) throws SQLException {
         String insertSql = "INSERT INTO tenants (property_id, room_id, full_name, email, phone, " +
-                           "emergency_contact, id_proof_number, move_in_date, security_deposit, tenant_status) " +
-                           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                           "emergency_contact, id_proof_number, move_in_date, monthly_rent, security_deposit, tenant_status) " +
+                           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         String updateRoomSql = "UPDATE rooms SET room_status = 'Occupied' WHERE room_id = ?";
 
@@ -60,8 +60,9 @@ public class TenantDAO {
             String idOrAddress = tenant.getPermanentAddress() != null ? tenant.getPermanentAddress().trim() : tenant.getIdProofNumber();
             pstmt.setString(7, idOrAddress);
             pstmt.setDate(8, tenant.getMoveInDate());
-            pstmt.setDouble(9, tenant.getSecurityDeposit());
-            pstmt.setString(10, tenant.getTenantStatus() != null ? tenant.getTenantStatus() : "Active");
+            pstmt.setDouble(9, tenant.getMonthlyRent());
+            pstmt.setDouble(10, tenant.getSecurityDeposit());
+            pstmt.setString(11, tenant.getTenantStatus() != null ? tenant.getTenantStatus() : "Active");
 
             int affectedRows = pstmt.executeUpdate();
             int generatedId = -1;
@@ -119,7 +120,7 @@ public class TenantDAO {
         String sql = "SELECT t.tenant_id, t.property_id, t.room_id, t.full_name, t.email, t.phone, " +
                      "t.emergency_contact, t.id_proof_number, t.move_in_date, t.move_out_date, " +
                      "t.security_deposit, t.tenant_status, t.created_at, " +
-                     "p.property_name, r.room_number, r.monthly_rent " +
+                     "p.property_name, r.room_number, COALESCE(t.monthly_rent, r.monthly_rent) AS monthly_rent " +
                      "FROM tenants t " +
                      "LEFT JOIN properties p ON t.property_id = p.property_id " +
                      "LEFT JOIN rooms r ON t.room_id = r.room_id " +
@@ -148,7 +149,7 @@ public class TenantDAO {
         String sql = "SELECT t.tenant_id, t.property_id, t.room_id, t.full_name, t.email, t.phone, " +
                      "t.emergency_contact, t.id_proof_number, t.move_in_date, t.move_out_date, " +
                      "t.security_deposit, t.tenant_status, t.created_at, " +
-                     "p.property_name, r.room_number, r.monthly_rent " +
+                     "p.property_name, r.room_number, COALESCE(t.monthly_rent, r.monthly_rent) AS monthly_rent " +
                      "FROM tenants t " +
                      "LEFT JOIN properties p ON t.property_id = p.property_id " +
                      "LEFT JOIN rooms r ON t.room_id = r.room_id " +
@@ -179,7 +180,7 @@ public class TenantDAO {
      */
     public boolean updateTenant(Tenant tenant) {
         String updateSql = "UPDATE tenants SET full_name = ?, email = ?, phone = ?, " +
-                           "emergency_contact = ?, id_proof_number = ?, tenant_status = ?, move_out_date = ? " +
+                           "emergency_contact = ?, id_proof_number = ?, monthly_rent = ?, tenant_status = ?, move_out_date = ? " +
                            "WHERE tenant_id = ?";
 
         String roomStatusSql = "UPDATE rooms SET room_status = ? WHERE room_id = ?";
@@ -199,9 +200,10 @@ public class TenantDAO {
             pstmt.setString(4, tenant.getEmergencyContact() != null ? tenant.getEmergencyContact().trim() : null);
             String idOrAddress = tenant.getPermanentAddress() != null ? tenant.getPermanentAddress().trim() : tenant.getIdProofNumber();
             pstmt.setString(5, idOrAddress);
-            pstmt.setString(6, tenant.getTenantStatus());
-            pstmt.setDate(7, tenant.getMoveOutDate());
-            pstmt.setInt(8, tenant.getTenantId());
+            pstmt.setDouble(6, tenant.getMonthlyRent());
+            pstmt.setString(7, tenant.getTenantStatus());
+            pstmt.setDate(8, tenant.getMoveOutDate());
+            pstmt.setInt(9, tenant.getTenantId());
 
             int affected = pstmt.executeUpdate();
 
@@ -320,9 +322,9 @@ public class TenantDAO {
 
         int previousRoomId = existing.getRoomId();
 
-        String assignSql = "UPDATE tenants SET property_id = ?, room_id = ?, move_in_date = ?, " +
+        String assignSql = "UPDATE tenants SET property_id = ?, room_id = ?, monthly_rent = ?, move_in_date = ?, " +
                            "tenant_status = 'Active' WHERE tenant_id = ?";
-        String occupyNewRoomSql = "UPDATE rooms SET room_status = 'Occupied', monthly_rent = ? WHERE room_id = ?";
+        String occupyNewRoomSql = "UPDATE rooms SET room_status = 'Occupied' WHERE room_id = ?";
         String freeOldRoomSql = "UPDATE rooms SET room_status = 'Vacant' WHERE room_id = ?";
 
         Connection conn = null;
@@ -334,18 +336,18 @@ public class TenantDAO {
             conn = DBConnection.getConnection();
             conn.setAutoCommit(false);
 
-            // 1. Update Tenant record
+            // 1. Update Tenant record with assigned property, room, and negotiated monthly rent
             assignStmt = conn.prepareStatement(assignSql);
             assignStmt.setInt(1, propertyId);
             assignStmt.setInt(2, roomId);
-            assignStmt.setDate(3, moveInDate != null ? moveInDate : new Date(System.currentTimeMillis()));
-            assignStmt.setInt(4, tenantId);
+            assignStmt.setDouble(3, monthlyRent);
+            assignStmt.setDate(4, moveInDate != null ? moveInDate : new Date(System.currentTimeMillis()));
+            assignStmt.setInt(5, tenantId);
             assignStmt.executeUpdate();
 
-            // 2. Mark new room Occupied
+            // 2. Mark new room Occupied (preserving original room default rent)
             occupyStmt = conn.prepareStatement(occupyNewRoomSql);
-            occupyStmt.setDouble(1, monthlyRent);
-            occupyStmt.setInt(2, roomId);
+            occupyStmt.setInt(1, roomId);
             occupyStmt.executeUpdate();
 
             // 3. If previous room was different, mark it Vacant
@@ -387,7 +389,7 @@ public class TenantDAO {
         String sql = "SELECT t.tenant_id, t.property_id, t.room_id, t.full_name, t.email, t.phone, " +
                      "t.emergency_contact, t.id_proof_number, t.move_in_date, t.move_out_date, " +
                      "t.security_deposit, t.tenant_status, t.created_at, " +
-                     "p.property_name, r.room_number, r.monthly_rent " +
+                     "p.property_name, r.room_number, COALESCE(t.monthly_rent, r.monthly_rent) AS monthly_rent " +
                      "FROM tenants t " +
                      "LEFT JOIN properties p ON t.property_id = p.property_id " +
                      "LEFT JOIN rooms r ON t.room_id = r.room_id " +
