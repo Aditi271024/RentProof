@@ -11,11 +11,53 @@
      - Slate:      #344454 (Text, Contrast Headers, Dark Neutrals)
    ============================================================================== */
 
+/* Page & Container Width Controls - Prevent Horizontal Overflow */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 100vh;
+  height: auto;
+}
+
+.app-container {
+  max-width: 100vw;
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.main-wrapper {
+  min-width: 0;
+  max-width: calc(100vw - var(--sidebar-width));
+  width: calc(100% - var(--sidebar-width));
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+.sidebar.collapsed + .main-wrapper {
+  max-width: calc(100vw - var(--sidebar-collapsed-width));
+  width: calc(100% - var(--sidebar-collapsed-width));
+}
+
+.page-content {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  padding: 24px 20px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
 /* Base Layout Container */
 .page-container {
-  max-width: 1380px;
+  max-width: 100%;
+  width: 100%;
   margin: 0 auto;
-  padding: 24px 28px;
+  padding: 0;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 /* Page Header Block */
@@ -238,19 +280,30 @@
   border: 1px solid rgba(198, 185, 159, 0.4);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   overflow: hidden;
+  min-width: 0;
 }
 
 .table-responsive {
   width: 100%;
-  overflow-x: auto;
+  max-width: 100%;
+  overflow-x: visible; /* Zero horizontal scrolling */
+  overflow-y: visible;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .tenants-table {
   width: 100%;
+  max-width: 100%;
   border-collapse: collapse;
   text-align: left;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
+  table-layout: fixed; /* Fixed layout ensures all columns fit without expanding container */
+  box-sizing: border-box;
 }
 
 .tenants-table thead {
@@ -259,13 +312,27 @@
 }
 
 .tenants-table th {
-  padding: 14px 18px;
+  padding: 12px 6px;
   font-weight: 600;
   color: var(--navy);
-  font-size: 0.82rem;
+  font-size: 0.74rem;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+  word-break: normal;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+.tenants-table th:first-child,
+.tenants-table td:first-child {
+  padding-left: 12px;
+}
+
+.tenants-table th:last-child,
+.tenants-table td:last-child {
+  padding-right: 12px;
 }
 
 .tenants-table tbody tr {
@@ -278,21 +345,25 @@
 }
 
 .tenants-table td {
-  padding: 14px 18px;
+  padding: 12px 6px;
   color: var(--slate);
   vertical-align: middle;
+  font-size: 0.82rem;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* Tenant Name Cell with Avatar Pill */
 .tenant-name-cell {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .tenant-avatar {
-  width: 36px;
-  height: 36px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--navy), var(--steel-blue));
   color: var(--ivory);
@@ -300,7 +371,7 @@
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   flex-shrink: 0;
   border: 1.5px solid var(--sand);
 }
@@ -308,83 +379,120 @@
 .tenant-name-text {
   font-weight: 600;
   color: var(--navy);
+  font-size: 0.82rem;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  min-width: 0;
 }
 
 .tenant-id-badge {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   background-color: var(--ivory-alt);
   color: var(--slate);
-  padding: 2px 7px;
+  padding: 2px 5px;
   border-radius: var(--radius-xs);
   font-weight: 600;
   border: 1px solid rgba(198, 185, 159, 0.4);
+  white-space: nowrap;
+  display: inline-block;
 }
 
 .tenant-contact-cell {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .contact-phone {
   font-weight: 500;
   color: var(--slate-dark);
+  font-size: 0.78rem;
+  white-space: nowrap;
 }
 
 .contact-email {
-  font-size: 0.82rem;
+  font-size: 0.72rem;
   color: var(--slate-muted);
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  line-height: 1.15;
+}
+
+.tenant-property-cell {
+  font-weight: 500;
+  color: var(--navy);
+  font-size: 0.82rem;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  display: block;
 }
 
 /* Property & Room Pill */
 .property-room-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 3px;
   background: var(--ivory-card);
-  padding: 4px 10px;
+  padding: 2px 6px;
   border-radius: var(--radius-full);
   border: 1px solid rgba(82, 107, 130, 0.2);
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   font-weight: 500;
   color: var(--slate);
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .room-badge {
   background-color: var(--navy);
   color: var(--white);
-  padding: 1px 7px;
+  padding: 1px 5px;
   border-radius: var(--radius-full);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 /* Rent & Amount styling */
 .rent-amount {
   font-weight: 700;
   color: var(--navy);
+  font-size: 0.82rem;
   font-feature-settings: "tnum";
+  white-space: nowrap;
+}
+
+.tenant-date-cell {
+  font-size: 0.78rem;
+  color: var(--slate);
+  white-space: nowrap;
 }
 
 /* Status Badges */
 .status-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
+  gap: 4px;
+  padding: 2px 6px;
   border-radius: var(--radius-full);
-  font-size: 0.78rem;
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: capitalize;
+  white-space: nowrap;
 }
 
 .status-pill::before {
   content: "";
   display: inline-block;
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .status-active {
@@ -418,13 +526,15 @@
 .table-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 3px;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
 }
 
 .btn-action {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-sm);
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-xs);
   border: 1px solid rgba(82, 107, 130, 0.25);
   background-color: var(--white);
   color: var(--slate);
@@ -433,8 +543,10 @@
   justify-content: center;
   cursor: pointer;
   transition: all var(--transition-fast);
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   text-decoration: none;
+  flex-shrink: 0;
+  padding: 0;
 }
 
 .btn-action:hover {
@@ -892,8 +1004,8 @@
    RESPONSIVE BREAKPOINTS
    ========================================== */
 @media (max-width: 992px) {
-  .page-container {
-    padding: 18px 20px;
+  .page-content {
+    padding: 18px 14px;
   }
   .form-grid {
     grid-template-columns: 1fr;
@@ -901,9 +1013,109 @@
   .form-group.col-span-2 {
     grid-column: span 1;
   }
+  .toolbar-card {
+    padding: 14px 16px;
+    gap: 12px;
+  }
+}
+
+/* Responsive Table -> Stacked Card Layout on Tablet & Mobile (<= 960px) */
+@media (max-width: 960px) {
+  .table-responsive {
+    overflow-x: visible;
+    overflow-y: visible;
+  }
+
+  .tenants-table {
+    table-layout: auto;
+    display: block;
+    width: 100%;
+    border: none;
+  }
+
+  .tenants-table colgroup,
+  .tenants-table thead {
+    display: none;
+  }
+
+  .tenants-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .tenants-table tbody tr {
+    display: block;
+    width: 100%;
+    margin-bottom: 14px;
+    background: var(--white);
+    border: 1px solid rgba(198, 185, 159, 0.45);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    box-shadow: var(--shadow-sm);
+    box-sizing: border-box;
+    transition: background-color var(--transition-fast);
+  }
+
+  .tenants-table tbody tr:hover {
+    background-color: var(--ivory-card);
+  }
+
+  .tenants-table td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(198, 185, 159, 0.2);
+    font-size: 0.85rem;
+    text-align: right;
+    overflow: visible;
+    min-height: 38px;
+    box-sizing: border-box;
+  }
+
+  .tenants-table td:first-child {
+    padding-left: 0;
+  }
+
+  .tenants-table td:last-child {
+    padding-right: 0;
+    border-bottom: none;
+    padding-top: 10px;
+    padding-bottom: 2px;
+  }
+
+  .tenants-table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--slate-muted);
+    text-align: left;
+    padding-right: 12px;
+    flex-shrink: 0;
+  }
+
+  .tenant-name-cell {
+    justify-content: flex-end;
+  }
+
+  .tenant-contact-cell {
+    align-items: flex-end;
+    text-align: right;
+  }
+
+  .table-actions {
+    justify-content: flex-end;
+  }
 }
 
 @media (max-width: 768px) {
+  .main-wrapper {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin-left: 0 !important;
+  }
   .page-header-bar {
     flex-direction: column;
     align-items: flex-start;
@@ -914,10 +1126,18 @@
   }
   .search-input-wrapper {
     min-width: 100%;
+    max-width: 100%;
   }
   .toolbar-left, .toolbar-right {
     width: 100%;
     justify-content: space-between;
+  }
+  .filter-group {
+    flex: 1 1 45%;
+  }
+  .filter-select {
+    width: 100%;
+    min-width: 100px;
   }
   .tenant-details-grid {
     grid-template-columns: 1fr;
