@@ -402,7 +402,7 @@ public class PaymentDAO {
     public ArrayList<Map<String, Object>> getAvailableTenants() {
         ArrayList<Map<String, Object>> tenants = new ArrayList<>();
         String sql = "SELECT t.tenant_id, t.full_name, t.phone, t.property_id, t.room_id, " +
-                     "pr.property_name, r.room_number, r.monthly_rent " +
+                     "pr.property_name, r.room_number, COALESCE(t.monthly_rent, r.monthly_rent) AS monthly_rent " +
                      "FROM tenants t " +
                      "LEFT JOIN properties pr ON t.property_id = pr.property_id " +
                      "LEFT JOIN rooms r ON t.room_id = r.room_id " +

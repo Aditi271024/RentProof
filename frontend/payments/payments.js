@@ -236,6 +236,13 @@ async function loadTenants() {
       if (Array.isArray(data) && data.length > 0) return data;
     }
   } catch (err) {}
+  const stored = localStorage.getItem("rentproof_tenants");
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch (e) {}
+  }
   return [...SEED_TENANTS];
 }
 
@@ -250,6 +257,13 @@ async function loadProperties() {
       if (Array.isArray(data) && data.length > 0) return data;
     }
   } catch (err) {}
+  const stored = localStorage.getItem("rentproof_properties");
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    } catch (e) {}
+  }
   return [...SEED_PROPERTIES];
 }
 
@@ -264,6 +278,15 @@ async function loadRooms(propertyId) {
       if (Array.isArray(data) && data.length > 0) return data;
     }
   } catch (err) {}
+  const stored = localStorage.getItem("rentproof_rooms");
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.filter((r) => Number(r.propertyId) === Number(propertyId));
+      }
+    } catch (e) {}
+  }
   return SEED_ROOMS.filter((r) => Number(r.propertyId) === Number(propertyId));
 }
 
