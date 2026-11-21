@@ -396,9 +396,8 @@ const TenantAPI = {
       }
     }
 
-    // Assign new room
+    // Assign new room (preserve original room default rent)
     newRoom.roomStatus = "Occupied";
-    newRoom.monthlyRent = Number(monthlyRent);
     saveStoredRooms(rooms);
 
     tenant.propertyId = Number(propertyId);
