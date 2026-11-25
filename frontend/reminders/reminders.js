@@ -149,9 +149,30 @@ let reminderToDeleteId = null;
 // INITIALIZATION ON DOM READY
 // =============================================================================
 
-document.addEventListener("DOMContentLoaded", () => {
+let cachedReminders = [];
+let cachedTenants = [];
+
+async function syncReminderBackendData() {
+  const user = JSON.parse(localStorage.getItem("rentproof_user")) || { landlordId: 1 };
+  try {
+    const [remRes, tenRes] = await Promise.all([
+      fetch(`/api/reminders?landlordId=${user.landlordId || 1}`),
+      fetch("/api/tenants")
+    ]);
+    if (remRes.ok) cachedReminders = await remRes.json();
+    if (tenRes.ok) cachedTenants = await tenRes.json();
+  } catch (e) {
+    console.error("[ReminderStorage] Error syncing with Java MySQL backend:", e);
+  }
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  if (!(await window.RentProofSecurity.requireSession())) return;
   setupNavigationAndSidebar();
   setupActiveUser();
+
+  // Load live reminders and tenants from MySQL
+  await syncReminderBackendData();
 
   // Route page actions based on active element
   if (document.getElementById("remindersTableBody")) {
@@ -164,37 +185,19 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // =============================================================================
-// LOCALSTORAGE DATA ACCESS LAYER
+// DATA ACCESS LAYER (Live MySQL via Core Java REST endpoints)
 // =============================================================================
 
 function getReminders() {
-  const stored = localStorage.getItem("rentproof_reminders");
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      console.error("Error parsing stored reminders:", e);
-    }
-  }
-  saveReminders(SEED_REMINDERS);
-  return [...SEED_REMINDERS];
+  return cachedReminders;
 }
 
 function saveReminders(reminders) {
-  localStorage.setItem("rentproof_reminders", JSON.stringify(reminders));
+  cachedReminders = reminders;
 }
 
 function getTenants() {
-  const stored = localStorage.getItem("rentproof_tenants");
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      console.error("Error parsing stored tenants:", e);
-    }
-  }
-  localStorage.setItem("rentproof_tenants", JSON.stringify(SEED_TENANTS));
-  return [...SEED_TENANTS];
+  return cachedTenants;
 }
 
 function getActivities() {
@@ -369,10 +372,10 @@ function renderRemindersTable() {
       const statusStr = (r.reminderStatus || "").toLowerCase();
 
       const matches = tenantStr.includes(currentSearchQuery) ||
-                      titleStr.includes(currentSearchQuery) ||
-                      msgStr.includes(currentSearchQuery) ||
-                      typeStr.includes(currentSearchQuery) ||
-                      statusStr.includes(currentSearchQuery);
+        titleStr.includes(currentSearchQuery) ||
+        msgStr.includes(currentSearchQuery) ||
+        typeStr.includes(currentSearchQuery) ||
+        statusStr.includes(currentSearchQuery);
       if (!matches) return false;
     }
 
@@ -545,24 +548,32 @@ function renderRemindersTable() {
 /**
  * Toggles a reminder between Pending and Completed.
  */
-function toggleReminderStatus(id) {
-  const reminders = getReminders();
-  const reminder = reminders.find(r => r.reminderId === id);
-  if (!reminder) return;
+async function toggleReminderStatus(id) {
+  try {
+    const res = await fetch("/api/reminders/toggle-status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reminderId: id })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      await syncReminderBackendData();
+      renderStats();
+      renderRemindersTable();
 
-  const wasCompleted = (reminder.reminderStatus === "Completed" || reminder.reminderStatus === "Resolved");
-  reminder.reminderStatus = wasCompleted ? "Pending" : "Completed";
-
-  saveReminders(reminders);
-  renderStats();
-  renderRemindersTable();
-
-  const actionText = wasCompleted ? "reopened as Pending" : "marked as Completed";
-  logActivity(
-    wasCompleted ? "↩️" : "✅",
-    `Reminder <strong>'${escapeHtml(reminder.title)}'</strong> ${actionText}.`
-  );
-  showToast(`Reminder #${id} ${actionText}!`, wasCompleted ? "info" : "success");
+      const newStatus = data.newStatus;
+      const isCompleted = newStatus === "Completed";
+      logActivity(
+        isCompleted ? "✅" : "↩️",
+        `Reminder #${id} status updated to <strong>${newStatus}</strong> in MySQL.`
+      );
+      showToast(`Reminder #${id} marked as ${newStatus}!`, isCompleted ? "success" : "info");
+    } else {
+      showToast("Failed to toggle status: " + (data.error || "Database error"), "danger");
+    }
+  } catch (err) {
+    showToast("Server error: " + err.message, "danger");
+  }
 }
 
 /**
@@ -663,22 +674,29 @@ function closeDeleteModal() {
   if (modal) modal.classList.remove("active");
 }
 
-function confirmExecuteDelete() {
+async function confirmExecuteDelete() {
   if (!reminderToDeleteId) return;
 
-  let reminders = getReminders();
-  const deletedItem = reminders.find(r => r.reminderId === reminderToDeleteId);
-  reminders = reminders.filter(r => r.reminderId !== reminderToDeleteId);
-  saveReminders(reminders);
-
-  if (deletedItem) {
-    logActivity("🗑️", `Deleted reminder <strong>'${escapeHtml(deletedItem.title)}'</strong>`);
+  try {
+    const res = await fetch("/api/reminders/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reminderId: reminderToDeleteId })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      logActivity("🗑️", `Deleted reminder #${reminderToDeleteId} from MySQL.`);
+      closeDeleteModal();
+      await syncReminderBackendData();
+      renderStats();
+      renderRemindersTable();
+      showToast(`Reminder #${reminderToDeleteId} deleted successfully from database.`, "danger");
+    } else {
+      showToast("Failed to delete reminder: " + (data.error || "Database error"), "danger");
+    }
+  } catch (err) {
+    showToast("Server error: " + err.message, "danger");
   }
-
-  closeDeleteModal();
-  renderStats();
-  renderRemindersTable();
-  showToast(`Reminder #${reminderToDeleteId} deleted successfully.`, "danger");
 }
 
 /**
@@ -855,7 +873,7 @@ function setupAddFormValidation() {
     dateInput.value = getDateOffset(5);
   }
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const tenantVal = document.getElementById("reminderTenantSelect").value;
@@ -905,42 +923,49 @@ function setupAddFormValidation() {
 
     if (hasError) return;
 
-    // Resolve tenant details
-    const tenants = getTenants();
-    let tenantId = null;
-    let tenantName = null;
+    const user = JSON.parse(localStorage.getItem("rentproof_user")) || { landlordId: 1 };
+    let tenantId = (tenantVal !== "GENERAL") ? parseInt(tenantVal, 10) : 0;
 
-    if (tenantVal !== "GENERAL") {
-      tenantId = parseInt(tenantVal, 10);
-      const matched = tenants.find(t => t.tenantId === tenantId);
-      if (matched) {
-        tenantName = matched.fullName;
-      }
-    }
-
-    const reminders = getReminders();
-    const newId = reminders.length > 0 ? Math.max(...reminders.map(r => r.reminderId)) + 1 : 1;
-
-    const newReminder = {
-      reminderId: newId,
-      landlordId: 1, // Default Landlord (Aditi Sharma)
+    const payload = {
+      landlordId: user.landlordId || 1,
       tenantId: tenantId,
-      tenantName: tenantName,
       title: titleVal,
       message: messageVal,
       dueDate: dueDateVal,
       reminderType: typeVal,
-      reminderStatus: statusVal,
-      createdAt: new Date().toISOString().replace("T", " ").substring(0, 19)
+      reminderStatus: statusVal
     };
 
-    reminders.push(newReminder);
-    saveReminders(reminders);
+    const submitBtn = document.getElementById("submitReminderBtn");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Saving to Database...";
+    }
 
-    logActivity("➕", `Created new reminder <strong>'${escapeHtml(titleVal)}'</strong> for <strong>${escapeHtml(tenantName || 'All Residents')}</strong>`);
-
-    // Redirect to dashboard with success query
-    window.location.href = "reminders.html?created=true";
+    try {
+      const res = await fetch("/api/reminders/add", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        logActivity("➕", `Created new reminder <strong>'${escapeHtml(titleVal)}'</strong> in MySQL.`);
+        window.location.href = "reminders.html?created=true";
+      } else {
+        alert("Error creating reminder: " + (data.error || "Database error"));
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "💾 Create Reminder";
+        }
+      }
+    } catch (err) {
+      alert("Server communication error: " + err.message);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "💾 Create Reminder";
+      }
+    }
   });
 }
 
@@ -1015,27 +1040,51 @@ function initEditReminderPage() {
 
       if (hasError) return;
 
-      // Update tenant
-      const tenants = getTenants();
-      if (tenantVal === "GENERAL") {
-        reminder.tenantId = null;
-        reminder.tenantName = null;
-      } else {
-        reminder.tenantId = parseInt(tenantVal, 10);
-        const matched = tenants.find(t => t.tenantId === reminder.tenantId);
-        reminder.tenantName = matched ? matched.fullName : null;
+      const user = JSON.parse(localStorage.getItem("rentproof_user")) || { landlordId: 1 };
+      let tenantId = (tenantVal !== "GENERAL") ? parseInt(tenantVal, 10) : 0;
+
+      const payload = {
+        reminderId: reminderId,
+        landlordId: user.landlordId || 1,
+        tenantId: tenantId,
+        title: titleVal,
+        reminderType: typeVal,
+        dueDate: dueDateVal,
+        reminderStatus: statusVal,
+        message: messageVal
+      };
+
+      const submitBtn = form.querySelector("button[type='submit']");
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Updating in Database...";
       }
 
-      reminder.title = titleVal;
-      reminder.reminderType = typeVal;
-      reminder.dueDate = dueDateVal;
-      reminder.reminderStatus = statusVal;
-      reminder.message = messageVal;
-
-      saveReminders(reminders);
-      logActivity("✏️", `Updated reminder <strong>'${escapeHtml(titleVal)}'</strong> (#REM-${reminder.reminderId})`);
-
-      window.location.href = "reminders.html?updated=true";
+      fetch("/api/reminders/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+        .then(async (res) => {
+          const data = await res.json();
+          if (res.ok && data.success) {
+            logActivity("✏️", `Updated reminder <strong>'${escapeHtml(titleVal)}'</strong> in MySQL.`);
+            window.location.href = "reminders.html?updated=true";
+          } else {
+            alert("Error updating reminder: " + (data.error || "Database error"));
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = "💾 Update Reminder";
+            }
+          }
+        })
+        .catch((err) => {
+          alert("Server error: " + err.message);
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "💾 Update Reminder";
+          }
+        });
     });
   }
 }
