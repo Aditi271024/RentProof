@@ -30,7 +30,7 @@ public class LandlordDAO {
      * @throws SQLException if a database error occurs (e.g. duplicate email)
      */
     public int registerLandlord(Landlord landlord) throws SQLException {
-        String sql = "INSERT INTO landlords (full_name, email, phone, password_hash) VALUES (?, ?, ?, ?)";
+        String sql = "INSERT INTO landlords (full_name, email, phone, password_hash, password_salt, password_iterations) VALUES (?, ?, ?, ?, ?, ?)";
 
         // try-with-resources automatically closes Connection and PreparedStatement
         try (Connection conn = DBConnection.getConnection();
@@ -40,6 +40,8 @@ public class LandlordDAO {
             pstmt.setString(2, landlord.getEmail().toLowerCase().trim());
             pstmt.setString(3, landlord.getPhone().trim());
             pstmt.setString(4, landlord.getPasswordHash());
+            pstmt.setString(5, landlord.getPasswordSalt());
+            pstmt.setInt(6, landlord.getPasswordIterations());
 
             int affectedRows = pstmt.executeUpdate();
 
@@ -67,7 +69,7 @@ public class LandlordDAO {
      * @return Landlord object if found, or null if no matching record
      */
     public Landlord getLandlordByEmail(String email) {
-        String sql = "SELECT landlord_id, full_name, email, phone, password_hash, created_at FROM landlords WHERE email = ?";
+        String sql = "SELECT landlord_id, full_name, email, phone, password_hash, password_salt, password_iterations, created_at FROM landlords WHERE email = ?";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -92,7 +94,7 @@ public class LandlordDAO {
      * @return Landlord object if found, or null
      */
     public Landlord getLandlordById(int landlordId) {
-        String sql = "SELECT landlord_id, full_name, email, phone, password_hash, created_at FROM landlords WHERE landlord_id = ?";
+        String sql = "SELECT landlord_id, full_name, email, phone, password_hash, password_salt, password_iterations, created_at FROM landlords WHERE landlord_id = ?";
 
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -134,6 +136,23 @@ public class LandlordDAO {
         }
     }
 
+    public boolean updatePasswordHash(int landlordId, String passwordHash,
+                                      String passwordSalt, int passwordIterations) {
+        String sql = "UPDATE landlords SET password_hash = ?, password_salt = ?, password_iterations = ? "
+                   + "WHERE landlord_id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setString(1, passwordHash);
+            pstmt.setString(2, passwordSalt);
+            pstmt.setInt(3, passwordIterations);
+            pstmt.setInt(4, landlordId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("[LandlordDAO] Password migration failed.");
+            return false;
+        }
+    }
+
     /**
      * Helper method to map a single SQL ResultSet row to a Java Landlord object.
      * Demonstrates Object-Relational Mapping (ORM) fundamentals in Core Java.
@@ -145,6 +164,16 @@ public class LandlordDAO {
         landlord.setEmail(rs.getString("email"));
         landlord.setPhone(rs.getString("phone"));
         landlord.setPasswordHash(rs.getString("password_hash"));
+        try {
+            landlord.setPasswordSalt(rs.getString("password_salt"));
+        } catch (SQLException ignored) {
+            landlord.setPasswordSalt(null);
+        }
+        try {
+            landlord.setPasswordIterations(rs.getInt("password_iterations"));
+        } catch (SQLException ignored) {
+            landlord.setPasswordIterations(0);
+        }
         landlord.setCreatedAt(rs.getTimestamp("created_at"));
         return landlord;
     }

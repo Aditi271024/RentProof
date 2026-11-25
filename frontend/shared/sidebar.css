@@ -14,6 +14,7 @@
    1. COLLAPSIBLE LEFT SIDEBAR
    ========================================== */
 .sidebar {
+  font-family: var(--font-sans);
   position: fixed;
   top: 0;
   left: 0;
@@ -256,6 +257,7 @@
 }
 
 .top-navbar {
+  font-family: var(--font-sans);
   height: var(--navbar-height);
   background-color: var(--white);
   border-bottom: 1px solid var(--sand-light);

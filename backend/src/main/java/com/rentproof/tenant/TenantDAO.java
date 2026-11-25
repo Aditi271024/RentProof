@@ -126,6 +126,18 @@ public class TenantDAO {
         }
     }
 
+    public boolean roomBelongsToProperty(int roomId, int propertyId) throws SQLException {
+        String sql = "SELECT 1 FROM rooms WHERE room_id = ? AND property_id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, roomId);
+            pstmt.setInt(2, propertyId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
     /**
      * Retrieves all tenants in the system, joined with property and room details.
      * 
@@ -350,6 +362,17 @@ public class TenantDAO {
      *         failed
      */
     public boolean assignProperty(int tenantId, int propertyId, int roomId, double monthlyRent, Date moveInDate) {
+        try {
+            if (!roomBelongsToProperty(roomId, propertyId)) {
+                System.err.println("[TenantDAO] Cannot assign room ID " + roomId
+                        + " because it does not belong to property ID " + propertyId + ".");
+                return false;
+            }
+        } catch (SQLException e) {
+            System.err.println("[TenantDAO] Could not verify room/property assignment: " + e.getMessage());
+            return false;
+        }
+
         // Check if destination room is vacant
         if (!isRoomVacant(roomId)) {
             System.err.println(

@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RentProof - Property Management</title>
+  <!-- Google Fonts: Bodoni Moda (Headings) & Poppins (UI / Body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../shared/common.css">
   <link rel="stylesheet" href="../shared/sidebar.css">
   <link rel="stylesheet" href="properties.css">
@@ -19,7 +23,7 @@
       
       <!-- Brand Logo / Header -->
       <div class="sidebar-header">
-        <a href="properties.html" class="brand-link">
+        <a href="../dashboard/dashboard.html" class="brand-link">
           <div class="brand-logo-icon">RP</div>
           <span class="brand-name">Rent<span>Proof</span></span>
         </a>
@@ -29,52 +33,56 @@
       <nav class="sidebar-nav">
         <div class="nav-section-title">Main Portal</div>
         
+        <!-- 1. Dashboard -->
+        <a href="../dashboard/dashboard.html" class="nav-item" data-tooltip="Dashboard">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <!-- 2. Properties -->
         <a href="properties.html" class="nav-item active" data-tooltip="Properties">
           <span class="nav-icon">🏢</span>
           <span class="nav-label">Properties</span>
         </a>
 
-        <a href="javascript:void(0)" class="nav-item" data-tooltip="Dashboard" onclick="showModuleNotice('Dashboard Overview', 'Aditi Sharma')">
-          <span class="nav-icon">📊</span>
-          <span class="nav-label">Dashboard</span>
-        </a>
-
         <div class="nav-section-title">Team Modules</div>
 
-        <!-- Shweta's Module Link -->
-        <a href="../tenants/tenants.html" class="nav-item" data-tooltip="Tenants (Shweta)">
+        <!-- 3. Tenants -->
+        <a href="../tenants/tenants.html" class="nav-item" data-tooltip="Tenants">
           <span class="nav-icon">👥</span>
           <span class="nav-label">Tenants</span>
         </a>
 
-        <!-- Aanvi's Module Link -->
-        <a href="javascript:void(0)" class="nav-item" data-tooltip="Payments (Aanvi)" onclick="showModuleNotice('Rent & Payments', 'Aanvi')">
+        <!-- 4. Rent & Payments -->
+        <a href="../payments/payments.html" class="nav-item" data-tooltip="Rent & Payments">
           <span class="nav-icon">💳</span>
           <span class="nav-label">Rent & Payments</span>
         </a>
 
-        <!-- Gungun's Module Link -->
-        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reminders (Gungun)" onclick="showModuleNotice('Reminders & Alerts', 'Gungun')">
+        <!-- 5. Reminders -->
+        <a href="../reminders/reminders.html" class="nav-item" data-tooltip="Reminders">
           <span class="nav-icon">🔔</span>
           <span class="nav-label">Reminders</span>
         </a>
 
         <div class="nav-section-title">System</div>
 
-        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports" onclick="alert('Reports module will generate rental revenue and occupancy statements.')">
+        <!-- 6. Reports -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports">
           <span class="nav-icon">📈</span>
           <span class="nav-label">Reports</span>
         </a>
 
-        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings" onclick="alert('Settings module: Manage landlord profile and account preferences.')">
+        <!-- 7. Settings -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings">
           <span class="nav-icon">⚙️</span>
           <span class="nav-label">Settings</span>
         </a>
       </nav>
 
-      <!-- Sidebar Footer / Logout -->
+      <!-- 8. Sidebar Footer / Logout -->
       <div class="sidebar-footer">
-        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Logout">
+        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Sign Out">
           <span class="nav-icon">🚪</span>
           <span class="logout-text">Sign Out</span>
         </a>
@@ -106,13 +114,13 @@
         </div>
 
         <div class="navbar-right">
-          <button class="notification-btn" title="System Notifications" onclick="alert('No unread notifications at this time.')">
+          <button class="notification-btn" id="notificationButton" title="System Notifications">
             🔔
             <span class="notification-badge"></span>
           </button>
 
           <!-- Landlord Profile Pill -->
-          <div class="landlord-profile-pill" onclick="alert('Logged in Landlord: Aditi Sharma\nRole: Property Administrator\nModule: Database, Auth & Properties')">
+          <div class="landlord-profile-pill" id="landlordProfilePill">
             <div class="profile-avatar" id="landlordAvatarInitials">AS</div>
             <div class="profile-details">
               <span class="profile-name" id="landlordDisplayName">Aditi Sharma</span>
@@ -223,13 +231,13 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3>Property Overview</h3>
-        <button class="modal-close-btn" onclick="closeDetailsModal()">&times;</button>
+        <button class="modal-close-btn" data-action="close-details">&times;</button>
       </div>
       <div class="modal-body" id="detailsModalBody">
         <!-- Injected via properties.js -->
       </div>
       <div class="modal-actions">
-        <button class="btn btn-outline btn-sm" onclick="closeDetailsModal()">Close</button>
+        <button class="btn btn-outline btn-sm" data-action="close-details">Close</button>
       </div>
     </div>
   </div>
@@ -241,7 +249,7 @@
     <div class="modal-box" style="max-width: 440px;">
       <div class="modal-header" style="background-color: var(--danger-bg); border-bottom-color: var(--danger-border);">
         <h3 style="color: var(--danger);">Confirm Property Deletion</h3>
-        <button class="modal-close-btn" onclick="closeDeleteModal()">&times;</button>
+        <button class="modal-close-btn" data-action="close-delete">&times;</button>
       </div>
       <div class="modal-body">
         <p style="margin-bottom: 12px;">
@@ -253,12 +261,13 @@
         </div>
       </div>
       <div class="modal-actions">
-        <button class="btn btn-outline btn-sm" onclick="closeDeleteModal()">Cancel</button>
-        <button class="btn btn-danger btn-sm" onclick="confirmExecuteDelete()">Confirm Delete</button>
+        <button class="btn btn-outline btn-sm" data-action="close-delete">Cancel</button>
+        <button class="btn btn-danger btn-sm" data-action="confirm-delete">Confirm Delete</button>
       </div>
     </div>
   </div>
 
+  <script src="../shared/security.js"></script>
   <script src="properties.js"></script>
 </body>
 </html>

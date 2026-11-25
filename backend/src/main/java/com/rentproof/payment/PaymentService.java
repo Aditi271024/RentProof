@@ -229,12 +229,13 @@ public class PaymentService {
      * - pendingPaymentCount (int)
      * - overduePaymentCount (int)
      */
-    public Map<String, Object> getDashboardStats() {
+    public Map<String, Object> getDashboardStats(int landlordId) {
         Map<String, Object> stats = new HashMap<>();
-        stats.put("totalRentCollected", paymentDAO.getTotalRentCollected());
-        stats.put("successfulPaymentCount", paymentDAO.getSuccessfulPaymentCount());
-        stats.put("pendingPaymentCount", paymentDAO.getPendingPaymentCount());
-        stats.put("overduePaymentCount", paymentDAO.getOverduePaymentCount());
+        stats.put("totalRentCollected", paymentDAO.getTotalRentCollected(landlordId));
+        stats.put("successfulPaymentCount", paymentDAO.getSuccessfulPaymentCount(landlordId));
+        stats.put("pendingPaymentCount", paymentDAO.getPendingPaymentCount(landlordId));
+        stats.put("overduePaymentCount", paymentDAO.getOverduePaymentCount(landlordId));
+        stats.put("overdueAmount", paymentDAO.getOverdueAmount(landlordId));
         return stats;
     }
 

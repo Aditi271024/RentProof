@@ -7,39 +7,19 @@
  * - Real-time client-side form validation
  * - Email format & Indian 10-digit phone number checking
  * - Password confirmation validation & show/hide toggle
- * - Standalone demo session state (localStorage persistence)
  * - Clear alerts and error states
- * - Easy API-integration bridge for backend Servlets / REST endpoints
+ * - Core Java API integration
  */
 
 // Regular expressions conforming to Core Java AuthService patterns
 const EMAIL_REGEX = /^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
 const PHONE_REGEX = /^[6-9]\d{9}$/;
 
-// Pre-seeded Demo Landlord Accounts (matches database/rentproof.sql)
-const DEFAULT_DEMO_ACCOUNTS = [
-  {
-    landlordId: 1,
-    fullName: "Aditi Sharma",
-    email: "aditi.landlord@rentproof.com",
-    phone: "9876543210",
-    password: "RentProof@123"
-  },
-  {
-    landlordId: 2,
-    fullName: "Rajesh Kumar Verma",
-    email: "rajesh.verma@gmail.com",
-    phone: "9811223344",
-    password: "RentProof@123"
-  }
-];
-
 // Initialize on DOM ready
 document.addEventListener("DOMContentLoaded", () => {
   setupPasswordToggles();
   setupLoginForm();
   setupRegisterForm();
-  setupDemoQuickFill();
 });
 
 /**
@@ -109,33 +89,51 @@ function setupLoginForm() {
     const email = emailInput.value.trim().toLowerCase();
     const password = passwordInput.value;
 
-    // Check credentials against local user accounts or demo seed
-    const registeredUsers = JSON.parse(localStorage.getItem("rentproof_registered_users")) || DEFAULT_DEMO_ACCOUNTS;
-    const matchedUser = registeredUsers.find(
-      (u) => u.email.toLowerCase() === email && u.password === password
-    );
-
-    if (matchedUser) {
-      showAlert("loginAlert", "Login successful! Redirecting to Properties Dashboard...", "success");
-
-      // Save active session
-      localStorage.setItem("rentproof_user", JSON.stringify({
-        landlordId: matchedUser.landlordId || 1,
-        fullName: matchedUser.fullName,
-        email: matchedUser.email,
-        phone: matchedUser.phone
-      }));
-
-      setTimeout(() => {
-        window.location.href = "../properties/properties.html";
-      }, 900);
-    } else {
-      showAlert(
-        "loginAlert",
-        "Invalid email or password. Please verify your credentials or use the Demo Quick-Fill below.",
-        "error"
-      );
+    const submitBtn = loginForm.querySelector("button[type='submit']");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Authenticating...";
     }
+
+    // Call live Core Java AuthService endpoint
+    fetch("/api/auth/login", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (res.ok && data.success && data.landlord) {
+          showAlert("loginAlert", "Login successful! Redirecting to Landlord Dashboard...", "success");
+          // Save active session for client header display
+          localStorage.setItem("rentproof_user", JSON.stringify(data.landlord));
+          setTimeout(() => {
+            window.location.href = "../dashboard/dashboard.html";
+          }, 800);
+        } else {
+          showAlert(
+            "loginAlert",
+            data.error || "Invalid email or password. Please verify credentials.",
+            "error"
+          );
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Sign In";
+          }
+        }
+      })
+      .catch((err) => {
+        showAlert(
+          "loginAlert",
+          "Cannot connect to RentProof Java backend on port 8080. Please ensure RentProofServer is running.",
+          "error"
+        );
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Sign In";
+        }
+      });
   });
 }
 
@@ -218,53 +216,47 @@ function setupRegisterForm() {
 
     if (!isValid) return;
 
-    // Check duplicate email
-    const registeredUsers = JSON.parse(localStorage.getItem("rentproof_registered_users")) || [...DEFAULT_DEMO_ACCOUNTS];
-    const exists = registeredUsers.some((u) => u.email.toLowerCase() === emailInput.value.trim().toLowerCase());
-
-    if (exists) {
-      showAlert("registerAlert", "An account with this email already exists. Please login instead.", "error");
-      return;
+    const submitBtn = registerForm.querySelector("button[type='submit']");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Creating Account in Database...";
     }
 
-    // Create new landlord
-    const newLandlord = {
-      landlordId: Date.now(),
-      fullName: nameInput.value.trim(),
-      email: emailInput.value.trim().toLowerCase(),
-      phone: phoneInput.value.trim(),
-      password: passInput.value // In real backend, Java AuthService hashes this using SHA-256
-    };
-
-    registeredUsers.push(newLandlord);
-    localStorage.setItem("rentproof_registered_users", JSON.stringify(registeredUsers));
-
-    showAlert("registerAlert", "Account created successfully! Redirecting to login...", "success");
-
-    setTimeout(() => {
-      window.location.href = "login.html?registered=true";
-    }, 1200);
-  });
-}
-
-/**
- * Fills demo credentials for quick faculty evaluation.
- */
-function setupDemoQuickFill() {
-  const quickFillBtn = document.getElementById("quickFillBtn");
-  if (!quickFillBtn) return;
-
-  quickFillBtn.addEventListener("click", () => {
-    const emailInput = document.getElementById("loginEmail");
-    const passwordInput = document.getElementById("loginPassword");
-    if (emailInput && passwordInput) {
-      emailInput.value = "aditi.landlord@rentproof.com";
-      passwordInput.value = "RentProof@123";
-      clearFieldError("loginEmailError");
-      clearFieldError("loginPasswordError");
-      emailInput.classList.remove("is-invalid");
-      passwordInput.classList.remove("is-invalid");
-    }
+    // Call live Core Java AuthService endpoint
+    fetch("/api/auth/register", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fullName: nameInput.value.trim(),
+        email: emailInput.value.trim().toLowerCase(),
+        phone: phoneInput.value.trim(),
+        password: passInput.value,
+        confirmPassword: confirmInput.value
+      })
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (res.ok && data.success && data.landlord) {
+          showAlert("registerAlert", "Account created successfully in MySQL! Redirecting to login...", "success");
+          setTimeout(() => {
+            window.location.href = "login.html?registered=true";
+          }, 1200);
+        } else {
+          showAlert("registerAlert", data.error || "Registration failed.", "error");
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Create Landlord Account";
+          }
+        }
+      })
+      .catch((err) => {
+        showAlert("registerAlert", "Cannot connect to RentProof Java backend on port 8080.", "error");
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "Create Landlord Account";
+        }
+      });
   });
 }
 
