@@ -34,7 +34,8 @@ public class Tenant implements Comparable<Tenant> {
     private String tenantStatus; // 'Active', 'Moved Out', 'Pending'
     private Timestamp createdAt;
 
-    // Relational Display Fields (populated from joined 'properties' & 'rooms' tables)
+    // Relational Display Fields (populated from joined 'properties' & 'rooms'
+    // tables)
     private String propertyName;
     private String roomNumber;
 
@@ -48,11 +49,12 @@ public class Tenant implements Comparable<Tenant> {
     }
 
     /**
-     * Parameterized Constructor without tenantId (used when registering a new tenant before DB insert).
+     * Parameterized Constructor without tenantId (used when registering a new
+     * tenant before DB insert).
      */
     public Tenant(int propertyId, int roomId, String fullName, String email, String phone,
-                  String emergencyContact, String permanentAddress, Date moveInDate,
-                  double monthlyRent, double securityDeposit, String tenantStatus) {
+            String emergencyContact, String permanentAddress, Date moveInDate,
+            double monthlyRent, double securityDeposit, String tenantStatus) {
         this.propertyId = propertyId;
         this.roomId = roomId;
         this.fullName = fullName;
@@ -70,9 +72,9 @@ public class Tenant implements Comparable<Tenant> {
      * Full Parameterized Constructor (used when mapping existing database rows).
      */
     public Tenant(int tenantId, int propertyId, int roomId, String fullName, String email,
-                  String phone, String emergencyContact, String permanentAddress, String idProofNumber,
-                  Date moveInDate, Date moveOutDate, double monthlyRent, double securityDeposit,
-                  String tenantStatus, Timestamp createdAt, String propertyName, String roomNumber) {
+            String phone, String emergencyContact, String permanentAddress, String idProofNumber,
+            Date moveInDate, Date moveOutDate, double monthlyRent, double securityDeposit,
+            String tenantStatus, Timestamp createdAt, String propertyName, String roomNumber) {
         this.tenantId = tenantId;
         this.propertyId = propertyId;
         this.roomId = roomId;
