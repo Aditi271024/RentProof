@@ -88,11 +88,13 @@ public class TenantService {
         }
 
         // 5. Financial Validation (no negative rents or deposits)
-        if (tenant.getMonthlyRent() < 0) {
-            return "Monthly rent cannot be negative.";
+        if (!Double.isFinite(tenant.getMonthlyRent()) || tenant.getMonthlyRent() < 0
+                || tenant.getMonthlyRent() > 99999999.99) {
+            return "Monthly rent must be between 0 and 99,999,999.99.";
         }
-        if (tenant.getSecurityDeposit() < 0) {
-            return "Security deposit cannot be negative.";
+        if (!Double.isFinite(tenant.getSecurityDeposit()) || tenant.getSecurityDeposit() < 0
+                || tenant.getSecurityDeposit() > 99999999.99) {
+            return "Security deposit must be between 0 and 99,999,999.99.";
         }
 
         // 6. Property and Room Association
@@ -141,6 +143,14 @@ public class TenantService {
         if (!isValidStatus(tenant.getTenantStatus())) {
             return "Invalid tenant status. Allowed values: Active, Moved Out, Pending.";
         }
+        if (!Double.isFinite(tenant.getMonthlyRent()) || tenant.getMonthlyRent() < 0
+                || tenant.getMonthlyRent() > 99999999.99) {
+            return "Monthly rent must be between 0 and 99,999,999.99.";
+        }
+        if (!Double.isFinite(tenant.getSecurityDeposit()) || tenant.getSecurityDeposit() < 0
+                || tenant.getSecurityDeposit() > 99999999.99) {
+            return "Security deposit must be between 0 and 99,999,999.99.";
+        }
 
         return null; // Valid
     }
@@ -177,8 +187,10 @@ public class TenantService {
             return "Unable to verify that the selected room belongs to the property.";
         }
 
-        // Prevent assigning if room is already occupied
-        if (!tenantDAO.isRoomVacant(roomId)) {
+        boolean alreadyAssigned = tenant.getPropertyId() == propertyId && tenant.getRoomId() == roomId
+                && ("Active".equalsIgnoreCase(tenant.getTenantStatus())
+                    || "Pending".equalsIgnoreCase(tenant.getTenantStatus()));
+        if (!alreadyAssigned && !tenantDAO.isRoomVacant(roomId)) {
             return "The selected room is currently occupied or under maintenance. Please select a vacant room.";
         }
 
@@ -260,8 +272,8 @@ public class TenantService {
         if (assignmentError != null) {
             throw new IllegalArgumentException(assignmentError);
         }
-        if (monthlyRent < 0) {
-            throw new IllegalArgumentException("Monthly rent cannot be negative.");
+        if (!Double.isFinite(monthlyRent) || monthlyRent < 0 || monthlyRent > 99999999.99) {
+            throw new IllegalArgumentException("Monthly rent must be between 0 and 99,999,999.99.");
         }
 
         return tenantDAO.assignProperty(tenantId, propertyId, roomId, monthlyRent, moveInDate);

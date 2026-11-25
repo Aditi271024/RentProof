@@ -111,19 +111,18 @@
               class="nav-search-input" 
               id="globalTenantSearch" 
               placeholder="Quick search across properties..."
-              oninput="if(document.getElementById('tenantSearchInput')){document.getElementById('tenantSearchInput').value=this.value;renderTenantDashboard();}"
             >
           </div>
         </div>
 
         <div class="navbar-right">
-          <button class="notification-btn" title="System Notifications" onclick="alert('All tenant records and room assignments are up to date.')">
+          <button class="notification-btn" id="tenantNotificationBtn" title="System Notifications">
             🔔
             <span class="notification-badge"></span>
           </button>
 
           <!-- Landlord Profile Pill -->
-          <div class="landlord-profile-pill" onclick="alert('Logged in Landlord: Aditi Sharma\nRole: Property Administrator\nActive Module: Tenant Management (Shweta)')">
+          <div class="landlord-profile-pill">
             <div class="profile-avatar" id="landlordAvatarInitials">AS</div>
             <div class="profile-details">
               <span class="profile-name" id="landlordDisplayName">Aditi Sharma</span>
@@ -255,7 +254,7 @@
             <p>No tenant records match your current search or filter criteria. Add a new tenant or clear your filters to view records.</p>
             <div style="display: flex; gap: 12px;">
               <a href="add-tenant.html" class="btn btn-primary">➕ Register New Tenant</a>
-              <button class="btn btn-secondary" onclick="document.getElementById('resetFiltersBtn').click()">Reset Filters</button>
+              <button class="btn btn-secondary" id="emptyResetFiltersBtn" type="button">Reset Filters</button>
             </div>
           </div>
 

@@ -220,7 +220,8 @@ public class RoomDAO {
     }
 
     public boolean hasActiveTenant(int roomId) throws SQLException {
-        String sql = "SELECT 1 FROM tenants WHERE room_id = ? AND tenant_status = 'Active' LIMIT 1";
+        String sql = "SELECT 1 FROM tenants WHERE room_id = ? "
+                   + "AND tenant_status IN ('Active', 'Pending') LIMIT 1";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setInt(1, roomId);

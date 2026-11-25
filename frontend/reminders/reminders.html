@@ -114,13 +114,13 @@
         </div>
 
         <div class="navbar-right">
-          <button class="notification-btn" title="System Notifications" onclick="alert('You have reminders scheduled for this week. View upcoming cards below.')">
+          <button class="notification-btn" id="reminderNotificationBtn" title="System Notifications">
             🔔
             <span class="notification-badge"></span>
           </button>
 
           <!-- Landlord Profile Pill -->
-          <div class="landlord-profile-pill" onclick="alert('Logged in Landlord: Aditi Sharma\nRole: Administrator\nModule Lead: Gungun (Rent Reminders)')">
+          <div class="landlord-profile-pill">
             <div class="profile-avatar" id="landlordAvatarInitials">AS</div>
             <div class="profile-details">
               <span class="profile-name" id="landlordDisplayName">Aditi Sharma</span>
@@ -315,13 +315,13 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3>Reminder Details</h3>
-        <button class="modal-close-btn" onclick="closeViewModal()">&times;</button>
+        <button class="modal-close-btn" data-reminder-action="close-view">&times;</button>
       </div>
       <div class="modal-body" id="viewModalBody">
         <!-- Injected via reminders.js -->
       </div>
       <div class="modal-actions">
-        <button class="btn btn-outline btn-sm" onclick="closeViewModal()">Close</button>
+        <button class="btn btn-outline btn-sm" data-reminder-action="close-view">Close</button>
       </div>
     </div>
   </div>
@@ -333,7 +333,7 @@
     <div class="modal-box" style="max-width: 440px;">
       <div class="modal-header" style="background-color: var(--danger-bg); border-bottom-color: var(--danger-border);">
         <h3 style="color: var(--danger);">Confirm Reminder Deletion</h3>
-        <button class="modal-close-btn" onclick="closeDeleteModal()">&times;</button>
+        <button class="modal-close-btn" data-reminder-action="close-delete">&times;</button>
       </div>
       <div class="modal-body">
         <p style="margin-bottom: 12px; font-size: 0.95rem;">
@@ -345,8 +345,8 @@
         </div>
       </div>
       <div class="modal-actions">
-        <button class="btn btn-outline btn-sm" onclick="closeDeleteModal()">Cancel</button>
-        <button class="btn btn-danger btn-sm" onclick="confirmExecuteDelete()">Confirm Delete</button>
+        <button class="btn btn-outline btn-sm" data-reminder-action="close-delete">Cancel</button>
+        <button class="btn btn-danger btn-sm" data-reminder-action="confirm-delete">Confirm Delete</button>
       </div>
     </div>
   </div>
@@ -358,13 +358,13 @@
     <div class="modal-box">
       <div class="modal-header" style="background-color: #EFF6FF; border-bottom-color: #BFDBFE;">
         <h3 style="color: #1D4ED8;">Dispatch Notice to Tenant</h3>
-        <button class="modal-close-btn" onclick="closeSendNoticeModal()">&times;</button>
+        <button class="modal-close-btn" data-reminder-action="close-notice">&times;</button>
       </div>
       <div class="modal-body" id="sendNoticeModalBody">
         <!-- Injected via reminders.js -->
       </div>
       <div class="modal-actions">
-        <button class="btn btn-outline btn-sm" onclick="closeSendNoticeModal()">Cancel</button>
+        <button class="btn btn-outline btn-sm" data-reminder-action="close-notice">Cancel</button>
         <button class="btn btn-primary btn-sm" id="confirmSendNoticeBtn">Send Notification</button>
       </div>
     </div>

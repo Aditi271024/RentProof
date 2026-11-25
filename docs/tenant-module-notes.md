@@ -53,7 +53,9 @@ CREATE TABLE IF NOT EXISTS tenants (
     full_name VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL,
     phone VARCHAR(20) NOT NULL,
+    monthly_rent DECIMAL(10, 2) NULL DEFAULT NULL,
     emergency_contact VARCHAR(20) NULL,
+    permanent_address VARCHAR(255) NULL,
     id_proof_number VARCHAR(50) NULL,
     move_in_date DATE NOT NULL,
     move_out_date DATE NULL,
@@ -146,14 +148,15 @@ RentProof/
 
 ## 6. Frontend & Backend Integration Architecture
 
-1. **Isolated API Layer (`TenantAPI`):**  
-   All network requests are encapsulated in the `TenantAPI` object inside `tenants.js`. This allows the frontend to toggle seamlessly between:
-   - **Local Demonstration Mode:** Stores records in browser `localStorage`, pre-seeded with Aditi's `database/rentproof.sql` sample records.
-   - **Live Backend Mode:** Connects via RESTful JSON HTTP endpoints (`GET /api/tenants`, `POST /api/tenants`, etc.) when Java servlets or micro-handlers are deployed.
-2. **Dynamic Room Dropdown:**  
+1. **Isolated API Layer (`TenantAPI`):**
+   Tenant reads and writes use the authenticated Core Java JSON endpoints (`GET /api/tenants`, `POST /api/tenants`, and related routes) backed by JDBC/MySQL. The frontend is configured for the live backend; browser storage is not the source of truth for tenant or room records.
+2. **Dynamic Room Dropdown:**
    When a landlord selects a property on `add-tenant.html` or `assign-property.html`, the system filters the room inventory and displays **strictly vacant rooms**. If a property has no vacant rooms, the room selector is disabled with a clear warning: *"No vacant rooms available in this property"*.
-3. **Real-time Occupancy Synchronization:**  
-   When a tenant's status is changed to `Moved Out` or a tenant record is deleted, their assigned room status is immediately reset to `Vacant`.
+3. **Transactional Occupancy Synchronization:**
+   Registration and reassignment update the tenant and room in a transaction. `Active` and `Pending` tenants reserve their assigned room; moving out or deleting a tenant frees the room only when no other active or pending tenant is assigned to it.
+
+4. **Legacy schema migration:**
+   Tenant rent is stored in nullable `tenants.monthly_rent`; older rows without a tenant-specific amount continue to display the room's configured rent. Permanent address and ID proof are stored separately. `DatabaseInitializer` adds these legacy columns without dropping or rewriting existing data.
 
 ---
 

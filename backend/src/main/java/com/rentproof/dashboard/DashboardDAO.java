@@ -40,7 +40,7 @@ public class DashboardDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[DashboardDAO] Error fetching total properties: " + e.getMessage());
+            throw new IllegalStateException("Could not load dashboard property totals.", e);
         }
 
         // 2. Total Rooms, Occupied Rooms, Vacant Rooms
@@ -60,13 +60,13 @@ public class DashboardDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[DashboardDAO] Error fetching room stats: " + e.getMessage());
+            throw new IllegalStateException("Could not load dashboard room totals.", e);
         }
 
-        // 3. Total Active Tenants
+        // 3. Total tenants
         String tenantSql = "SELECT COUNT(t.tenant_id) " +
                            "FROM tenants t JOIN properties p ON t.property_id = p.property_id " +
-                           "WHERE p.landlord_id = ? AND t.tenant_status = 'Active'";
+                           "WHERE p.landlord_id = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(tenantSql)) {
             pstmt.setInt(1, landlordId);
@@ -76,7 +76,7 @@ public class DashboardDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[DashboardDAO] Error fetching total tenants: " + e.getMessage());
+            throw new IllegalStateException("Could not load dashboard tenant totals.", e);
         }
 
         // 4. Rent Collected (Paid)
@@ -92,7 +92,7 @@ public class DashboardDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[DashboardDAO] Error fetching rent collected: " + e.getMessage());
+            throw new IllegalStateException("Could not load collected rent totals.", e);
         }
 
         // 5. Pending Rent (Pending or Overdue)
@@ -108,7 +108,7 @@ public class DashboardDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[DashboardDAO] Error fetching pending rent: " + e.getMessage());
+            throw new IllegalStateException("Could not load pending rent totals.", e);
         }
 
         return stats;
@@ -119,13 +119,14 @@ public class DashboardDAO {
      */
     public ArrayList<PropertyOverviewDTO> getPropertyOverview(int landlordId) {
         ArrayList<PropertyOverviewDTO> list = new ArrayList<>();
-        String sql = "SELECT p.property_id, p.property_name, p.property_type, p.city, p.state, p.total_rooms, " +
+        String sql = "SELECT p.property_id, p.property_name, p.property_type, p.city, p.state, " +
+                     "COUNT(DISTINCT r.room_id) AS total_rooms, " +
                      "COUNT(CASE WHEN r.room_status = 'Occupied' THEN 1 END) AS occupied_rooms, " +
                      "COUNT(CASE WHEN r.room_status = 'Vacant' THEN 1 END) AS vacant_rooms " +
                      "FROM properties p " +
                      "LEFT JOIN rooms r ON p.property_id = r.property_id " +
                      "WHERE p.landlord_id = ? " +
-                     "GROUP BY p.property_id, p.property_name, p.property_type, p.city, p.state, p.total_rooms " +
+                     "GROUP BY p.property_id, p.property_name, p.property_type, p.city, p.state " +
                      "ORDER BY p.property_id DESC";
 
         try (Connection conn = DBConnection.getConnection();
@@ -147,7 +148,7 @@ public class DashboardDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[DashboardDAO] Error fetching property overview: " + e.getMessage());
+            throw new IllegalStateException("Could not load dashboard property overview.", e);
         }
         return list;
     }
@@ -184,7 +185,7 @@ public class DashboardDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[DashboardDAO] Error fetching recent payments: " + e.getMessage());
+            throw new IllegalStateException("Could not load recent payments.", e);
         }
         return list;
     }
@@ -220,7 +221,7 @@ public class DashboardDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[DashboardDAO] Error fetching pending rent: " + e.getMessage());
+            throw new IllegalStateException("Could not load pending rent records.", e);
         }
         return list;
     }
@@ -234,7 +235,8 @@ public class DashboardDAO {
                      "COALESCE(t.full_name, 'General Property Task') AS related_to " +
                      "FROM reminders r " +
                      "LEFT JOIN tenants t ON r.tenant_id = t.tenant_id " +
-                     "WHERE r.landlord_id = ? " +
+                     "WHERE r.landlord_id = ? AND r.due_date >= CURRENT_DATE " +
+                     "AND r.reminder_status <> 'Completed' " +
                      "ORDER BY r.due_date ASC LIMIT ?";
 
         try (Connection conn = DBConnection.getConnection();
@@ -255,7 +257,7 @@ public class DashboardDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[DashboardDAO] Error fetching reminders: " + e.getMessage());
+            throw new IllegalStateException("Could not load upcoming reminders.", e);
         }
         return list;
     }

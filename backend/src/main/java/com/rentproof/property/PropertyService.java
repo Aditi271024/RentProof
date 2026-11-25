@@ -91,8 +91,9 @@ public class PropertyService {
             return "Total rooms must be at least 1.";
         }
 
-        if (property.getMonthlyRent() < 0) {
-            return "Monthly rent cannot be negative.";
+        if (!Double.isFinite(property.getMonthlyRent()) || property.getMonthlyRent() < 0
+                || property.getMonthlyRent() > 99999999.99) {
+            return "Monthly rent must be between 0 and 99,999,999.99.";
         }
 
         return null; // All validation checks passed
@@ -157,6 +158,18 @@ public class PropertyService {
         } else {
             throw new SQLException("Failed to add property to database.");
         }
+    }
+
+    public int addPropertyWithInitialRooms(Property property, int landlordId) throws SQLException {
+        if (property == null) {
+            throw new IllegalArgumentException("Property object cannot be null.");
+        }
+        property.setLandlordId(landlordId);
+        String validationError = validateProperty(property);
+        if (validationError != null) {
+            throw new IllegalArgumentException(validationError);
+        }
+        return propertyDAO.addPropertyWithInitialRooms(property);
     }
 
     /**
@@ -320,8 +333,8 @@ public class PropertyService {
         }
         room.setRoomNumber(roomNumber);
         double monthlyRent = room.getMonthlyRent();
-        if (!Double.isFinite(monthlyRent) || monthlyRent < 0) {
-            throw new IllegalArgumentException("Monthly rent must be a non-negative number.");
+        if (!Double.isFinite(monthlyRent) || monthlyRent < 0 || monthlyRent > 99999999.99) {
+            throw new IllegalArgumentException("Monthly rent must be between 0 and 99,999,999.99.");
         }
     }
 

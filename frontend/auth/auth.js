@@ -20,6 +20,13 @@ document.addEventListener("DOMContentLoaded", () => {
   setupPasswordToggles();
   setupLoginForm();
   setupRegisterForm();
+  const forgotPasswordLink = document.getElementById("forgotPasswordLink");
+  if (forgotPasswordLink) {
+    forgotPasswordLink.addEventListener("click", (event) => {
+      event.preventDefault();
+      handleForgotPassword();
+    });
+  }
 });
 
 /**
@@ -266,7 +273,7 @@ function setupRegisterForm() {
 function handleForgotPassword() {
   const emailInput = document.getElementById("loginEmail");
   const email = emailInput && emailInput.value.trim() ? emailInput.value.trim() : "your registered email";
-  alert("Password Reset Request:\nA password recovery link has been prepared for " + email + ".\n(In production, an automated reset token is sent via email.)");
+  alert("Password recovery is not configured. Contact the RentProof administrator to reset " + email + ".");
 }
 
 // Utility Helpers
