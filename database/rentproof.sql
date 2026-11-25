@@ -124,6 +124,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     id_proof_number VARCHAR(50),
     move_in_date DATE NOT NULL,
     move_out_date DATE NULL,
+    monthly_rent DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     security_deposit DECIMAL(10, 2) DEFAULT 0.00,
     tenant_status VARCHAR(20) NOT NULL DEFAULT 'Active', -- 'Active', 'Moved Out', 'Pending'
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -257,10 +258,10 @@ INSERT INTO rooms (room_id, property_id, room_number, monthly_rent, room_status)
 (13, 3, 'B-104', 8500.00, 'Vacant');
 
 -- 4. Sample Integration Seed for Tenants (For Shweta's Module Reference)
-INSERT INTO tenants (tenant_id, property_id, room_id, full_name, email, phone, id_proof_number, move_in_date, security_deposit, tenant_status) VALUES
-(1, 1, 1, 'Rohan Verma', 'rohan.v@gmail.com', '9988776655', 'AADHAAR-8921-3412-9012', '2026-08-01', 17000.00, 'Active'),
-(2, 1, 2, 'Ankit Mishra', 'ankit.m@yahoo.com', '9871122334', 'AADHAAR-6712-4590-1123', '2026-09-15', 17000.00, 'Active'),
-(3, 2, 7, 'Sneha Kapoor', 'sneha.k@outlook.com', '9711334455', 'PAN-ABCDE1234F', '2026-07-01', 22000.00, 'Active');
+INSERT INTO tenants (tenant_id, property_id, room_id, full_name, email, phone, id_proof_number, move_in_date, monthly_rent, security_deposit, tenant_status) VALUES
+(1, 1, 1, 'Rohan Verma', 'rohan.v@gmail.com', '9988776655', 'AADHAAR-8921-3412-9012', '2026-08-01', 8500.00, 17000.00, 'Active'),
+(2, 1, 2, 'Ankit Mishra', 'ankit.m@yahoo.com', '9871122334', 'AADHAAR-6712-4590-1123', '2026-09-15', 8500.00, 17000.00, 'Active'),
+(3, 2, 7, 'Sneha Kapoor', 'sneha.k@outlook.com', '9711334455', 'PAN-ABCDE1234F', '2026-07-01', 11000.00, 22000.00, 'Active');
 
 -- 5. Sample Integration Seed for Payments (For Aanvi's Module Reference)
 INSERT INTO payments (payment_id, tenant_id, property_id, room_id, amount, payment_date, payment_month, payment_mode, transaction_ref, payment_status, remarks) VALUES

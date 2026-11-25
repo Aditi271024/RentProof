@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentProof - Record New Payment</title>
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="../shared/sidebar.css">
+  <link rel="stylesheet" href="payments.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ==========================================
+         COLLAPSIBLE LEFT SIDEBAR
+         ========================================== -->
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <a href="payments.html" class="brand-link">
+          <div class="brand-logo-icon">RP</div>
+          <span class="brand-name">Rent<span>Proof</span></span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Portal</div>
+        
+        <a href="../properties/properties.html" class="nav-item" data-tooltip="Properties">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-label">Properties</span>
+        </a>
+
+        <a href="payments.html" class="nav-item" data-tooltip="Rent & Payments">
+          <span class="nav-icon">💳</span>
+          <span class="nav-label">Rent & Payments</span>
+        </a>
+
+        <a href="add-payment.html" class="nav-item active" data-tooltip="Record Payment" style="padding-left: 28px; font-size: 0.88rem;">
+          <span class="nav-icon">➕</span>
+          <span class="nav-label">Record Payment</span>
+        </a>
+
+        <a href="payment-history.html" class="nav-item" data-tooltip="Payment History" style="padding-left: 28px; font-size: 0.88rem;">
+          <span class="nav-icon">📜</span>
+          <span class="nav-label">Payment History</span>
+        </a>
+
+        <div class="nav-section-title">Team Modules</div>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Tenants (Shweta)" onclick="showModuleNotice('Tenants Management', 'Shweta')">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Tenants</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reminders (Gungun)" onclick="showModuleNotice('Reminders & Alerts', 'Gungun')">
+          <span class="nav-icon">🔔</span>
+          <span class="nav-label">Reminders</span>
+        </a>
+
+        <div class="nav-section-title">System</div>
+
+        <a href="payment-history.html" class="nav-item" data-tooltip="Financial Audit">
+          <span class="nav-icon">📈</span>
+          <span class="nav-label">Financial Audit</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings" onclick="alert('Settings module placeholder.')">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Logout">
+          <span class="nav-icon">🚪</span>
+          <span class="logout-text">Sign Out</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- ==========================================
+         MAIN CONTENT AREA
+         ========================================== -->
+    <div class="main-wrapper">
+
+      <!-- TOP NAVBAR -->
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Navigation Sidebar">
+            ☰
+          </button>
+          <div style="font-size: 0.95rem; font-weight: 600; color: var(--navy);">
+            Payments &gt; <span style="color: var(--steel-blue);">Record Rent Payment</span>
+          </div>
+        </div>
+
+        <div class="navbar-right">
+          <button class="notification-btn" title="System Notifications">
+            🔔
+            <span class="notification-badge"></span>
+          </button>
+
+          <div class="landlord-profile-pill">
+            <div class="profile-avatar" id="landlordAvatarInitials">AV</div>
+            <div class="profile-details">
+              <span class="profile-name" id="landlordDisplayName">Aanvi</span>
+              <span class="profile-role">Payment Module &bull; Active</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- PAGE CONTENT CANVAS -->
+      <main class="page-content">
+
+        <!-- Page Title Header -->
+        <div class="page-header-bar">
+          <div class="page-title-block">
+            <h1>Record Rent Payment</h1>
+            <p>Log a rent payment received from a tenant, link property & room, and issue a digital payment record.</p>
+          </div>
+          <a href="payments.html" class="btn btn-secondary">
+            &larr; Back to Dashboard
+          </a>
+        </div>
+
+        <!-- 2-Column Form Layout: Form on Left, Live Receipt Preview on Right -->
+        <div class="payment-form-container">
+          
+          <!-- LEFT: The Payment Input Form -->
+          <div class="form-card">
+            <form id="addPaymentForm" novalidate>
+              
+              <!-- 1. Tenant Selection (Dynamic Auto-fill) -->
+              <div class="form-group">
+                <label for="tenantSelect">Select Tenant <span class="required">*</span></label>
+                <select class="form-control" id="tenantSelect" required>
+                  <option value="">-- Loading Tenants from Database... --</option>
+                </select>
+                <div class="field-error-msg" id="tenantSelectError"></div>
+                <div class="form-hint">Selecting a tenant automatically populates their assigned property, room, and standard monthly rent.</div>
+              </div>
+
+              <!-- 2. Property & Room (Cascading Dropdowns) -->
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="propertySelect">Select Property <span class="required">*</span></label>
+                  <select class="form-control" id="propertySelect" required>
+                    <option value="">-- Select Property --</option>
+                  </select>
+                  <div class="field-error-msg" id="propertySelectError"></div>
+                </div>
+
+                <div class="form-group">
+                  <label for="roomSelect">Select Room <span class="required">*</span></label>
+                  <select class="form-control" id="roomSelect" required>
+                    <option value="">-- Choose Property First --</option>
+                  </select>
+                  <div class="field-error-msg" id="roomSelectError"></div>
+                </div>
+              </div>
+
+              <!-- 3. Payment Amount & Payment Date -->
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="paymentAmount">Payment Amount (INR) <span class="required">*</span></label>
+                  <div class="input-with-prefix">
+                    <span class="input-prefix">₹</span>
+                    <input 
+                      type="number" 
+                      class="form-control" 
+                      id="paymentAmount" 
+                      step="0.01" 
+                      min="1" 
+                      placeholder="0.00" 
+                      required
+                    >
+                  </div>
+                  <div class="field-error-msg" id="paymentAmountError"></div>
+                </div>
+
+                <div class="form-group">
+                  <label for="paymentDate">Payment Date <span class="required">*</span></label>
+                  <input type="date" class="form-control" id="paymentDate" required>
+                  <div class="field-error-msg" id="paymentDateError"></div>
+                </div>
+              </div>
+
+              <!-- 4. Payment Month & Status -->
+              <div class="form-grid-2">
+                <div class="form-group">
+                  <label for="paymentMonth">Payment Month &amp; Year <span class="required">*</span></label>
+                  <input 
+                    type="text" 
+                    class="form-control" 
+                    id="paymentMonth" 
+                    placeholder="e.g. November 2026" 
+                    required
+                  >
+                  <div class="field-error-msg" id="paymentMonthError"></div>
+                </div>
+
+                <div class="form-group">
+                  <label for="paymentStatus">Payment Status <span class="required">*</span></label>
+                  <select class="form-control" id="paymentStatus" required>
+                    <option value="Paid">Paid (Confirmed & Received)</option>
+                    <option value="Pending">Pending (Invoice Generated / Due)</option>
+                    <option value="Overdue">Overdue (Past Agreed Date)</option>
+                    <option value="Failed">Failed (Cheque/Transfer Bounced)</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- 5. Payment Mode (Pill Radio Group) -->
+              <div class="form-group">
+                <label>Payment Mode <span class="required">*</span></label>
+                <div class="mode-pill-group">
+                  <div class="mode-pill">
+                    <input type="radio" name="paymentMode" id="modeUPI" value="UPI" checked>
+                    <label for="modeUPI">📱 UPI / GPay</label>
+                  </div>
+                  <div class="mode-pill">
+                    <input type="radio" name="paymentMode" id="modeBank" value="Bank Transfer">
+                    <label for="modeBank">🏦 Bank Transfer</label>
+                  </div>
+                  <div class="mode-pill">
+                    <input type="radio" name="paymentMode" id="modeCash" value="Cash">
+                    <label for="modeCash">💵 Cash</label>
+                  </div>
+                  <div class="mode-pill">
+                    <input type="radio" name="paymentMode" id="modeCheque" value="Cheque">
+                    <label for="modeCheque">📝 Cheque</label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 6. Transaction Reference -->
+              <div class="form-group" id="refGroup">
+                <label for="transactionRef">Transaction Reference / UTR Number</label>
+                <input 
+                  type="text" 
+                  class="form-control" 
+                  id="transactionRef" 
+                  placeholder="e.g. UPI/20261105/98218731 or NEFT ref"
+                >
+                <div class="field-error-msg" id="transactionRefError"></div>
+                <div class="form-hint">Recommended for UPI, Net Banking, and Cheque transactions.</div>
+              </div>
+
+              <!-- 7. Remarks -->
+              <div class="form-group">
+                <label for="paymentRemarks">Remarks / Notes</label>
+                <textarea 
+                  class="form-control" 
+                  id="paymentRemarks" 
+                  rows="3" 
+                  placeholder="e.g. Full rent paid on-time via Google Pay. Electricity dues included."
+                ></textarea>
+              </div>
+
+              <!-- Submit Button Row -->
+              <div style="display: flex; gap: 12px; margin-top: 24px;">
+                <button type="submit" class="btn btn-primary btn-lg" id="submitPaymentBtn">
+                  💾 Record Payment
+                </button>
+                <a href="payments.html" class="btn btn-secondary btn-lg">
+                  Cancel
+                </a>
+              </div>
+
+            </form>
+          </div>
+
+          <!-- RIGHT: Live Receipt Preview Card -->
+          <div class="receipt-preview-card">
+            <div class="receipt-preview-header">
+              <span class="receipt-watermark">Live Receipt Preview</span>
+              <div class="receipt-preview-title">Payment Voucher</div>
+              <div style="font-size: 0.78rem; color: var(--slate-muted); margin-top: 4px;">
+                Database Target: <code>rentproof.payments</code>
+              </div>
+            </div>
+
+            <div class="official-receipt" style="border: 1.5px dashed var(--steel-blue); padding: 18px; background: var(--ivory-card);">
+              <div class="receipt-stamp stamp-paid" id="previewStatusStamp">PAID</div>
+              
+              <div class="receipt-line-item">
+                <span class="label">Tenant:</span>
+                <span class="val" id="previewTenant">Not Selected</span>
+              </div>
+              <div class="receipt-line-item">
+                <span class="label">Property:</span>
+                <span class="val" id="previewProperty">Not Selected</span>
+              </div>
+              <div class="receipt-line-item">
+                <span class="label">Room:</span>
+                <span class="val" id="previewRoom">Not Selected</span>
+              </div>
+              <div class="receipt-line-item">
+                <span class="label">Date:</span>
+                <span class="val" id="previewDate">--</span>
+              </div>
+              <div class="receipt-line-item">
+                <span class="label">Billing Month:</span>
+                <span class="val" id="previewMonth">--</span>
+              </div>
+              <div class="receipt-line-item">
+                <span class="label">Payment Mode:</span>
+                <span class="val" id="previewMode">📱 UPI</span>
+              </div>
+              <div class="receipt-line-item">
+                <span class="label">Reference:</span>
+                <span class="val" id="previewRef" style="font-family: var(--font-mono); font-size: 0.78rem;">--</span>
+              </div>
+
+              <div class="receipt-total-row">
+                <span class="receipt-total-label">Total Amount</span>
+                <span class="receipt-total-value" id="previewTotal">₹0.00</span>
+              </div>
+            </div>
+
+            <div style="margin-top: 18px; font-size: 0.8rem; color: var(--slate-muted); line-height: 1.4;">
+              💡 <strong>Viva Point:</strong> Records created here are validated by <code>PaymentService.java</code> and inserted into MySQL via <code>PaymentDAO.java</code> using prepared statements.
+            </div>
+          </div>
+
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="payments.js"></script>
+</body>
+</html>
+

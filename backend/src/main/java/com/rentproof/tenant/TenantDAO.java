@@ -18,7 +18,8 @@ import java.util.ArrayList;
  * 
  * Concepts used (Syllabus up to Lecture 42):
  * - JDBC API: Connection, PreparedStatement, Statement, ResultSet
- * - try-with-resources for automatic resource closing (clean memory and socket management)
+ * - try-with-resources for automatic resource closing (clean memory and socket
+ * management)
  * - Parameterized SQL queries using ? placeholders (SQL injection defense)
  * - Object-Relational Mapping (ResultSet to Tenant object)
  * - Collection Framework: ArrayList for in-memory record storage
@@ -27,7 +28,8 @@ import java.util.ArrayList;
 public class TenantDAO {
 
     /**
-     * Inserts a new tenant into the MySQL database and sets the assigned room status to 'Occupied'.
+     * Inserts a new tenant into the MySQL database and sets the assigned room
+     * status to 'Occupied'.
      * 
      * @param tenant Tenant object containing registration details
      * @return generated tenant_id, or -1 on failure
@@ -35,8 +37,8 @@ public class TenantDAO {
      */
     public int addTenant(Tenant tenant) throws SQLException {
         String insertSql = "INSERT INTO tenants (property_id, room_id, full_name, email, phone, " +
-                           "emergency_contact, id_proof_number, move_in_date, security_deposit, tenant_status) " +
-                           "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "emergency_contact, id_proof_number, move_in_date, monthly_rent, security_deposit, tenant_status) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         String updateRoomSql = "UPDATE rooms SET room_status = 'Occupied' WHERE room_id = ?";
 
@@ -57,11 +59,13 @@ public class TenantDAO {
             pstmt.setString(5, tenant.getPhone().trim());
             pstmt.setString(6, tenant.getEmergencyContact() != null ? tenant.getEmergencyContact().trim() : null);
             // Map permanentAddress into id_proof_number / address metadata
-            String idOrAddress = tenant.getPermanentAddress() != null ? tenant.getPermanentAddress().trim() : tenant.getIdProofNumber();
+            String idOrAddress = tenant.getPermanentAddress() != null ? tenant.getPermanentAddress().trim()
+                    : tenant.getIdProofNumber();
             pstmt.setString(7, idOrAddress);
             pstmt.setDate(8, tenant.getMoveInDate());
-            pstmt.setDouble(9, tenant.getSecurityDeposit());
-            pstmt.setString(10, tenant.getTenantStatus() != null ? tenant.getTenantStatus() : "Active");
+            pstmt.setDouble(9, tenant.getMonthlyRent());
+            pstmt.setDouble(10, tenant.getSecurityDeposit());
+            pstmt.setString(11, tenant.getTenantStatus() != null ? tenant.getTenantStatus() : "Active");
 
             int affectedRows = pstmt.executeUpdate();
             int generatedId = -1;
@@ -97,14 +101,27 @@ public class TenantDAO {
             System.err.println("[TenantDAO] addTenant failed: " + e.getMessage());
             throw e;
         } finally {
-            if (generatedKeys != null) try { generatedKeys.close(); } catch (SQLException ignored) {}
-            if (pstmt != null) try { pstmt.close(); } catch (SQLException ignored) {}
-            if (updateRoomStmt != null) try { updateRoomStmt.close(); } catch (SQLException ignored) {}
+            if (generatedKeys != null)
+                try {
+                    generatedKeys.close();
+                } catch (SQLException ignored) {
+                }
+            if (pstmt != null)
+                try {
+                    pstmt.close();
+                } catch (SQLException ignored) {
+                }
+            if (updateRoomStmt != null)
+                try {
+                    updateRoomStmt.close();
+                } catch (SQLException ignored) {
+                }
             if (conn != null) {
                 try {
                     conn.setAutoCommit(true);
                     conn.close();
-                } catch (SQLException ignored) {}
+                } catch (SQLException ignored) {
+                }
             }
         }
     }
@@ -117,17 +134,17 @@ public class TenantDAO {
     public ArrayList<Tenant> getAllTenants() {
         ArrayList<Tenant> list = new ArrayList<>();
         String sql = "SELECT t.tenant_id, t.property_id, t.room_id, t.full_name, t.email, t.phone, " +
-                     "t.emergency_contact, t.id_proof_number, t.move_in_date, t.move_out_date, " +
-                     "t.security_deposit, t.tenant_status, t.created_at, " +
-                     "p.property_name, r.room_number, r.monthly_rent " +
-                     "FROM tenants t " +
-                     "LEFT JOIN properties p ON t.property_id = p.property_id " +
-                     "LEFT JOIN rooms r ON t.room_id = r.room_id " +
-                     "ORDER BY t.tenant_id DESC";
+                "t.emergency_contact, t.id_proof_number, t.move_in_date, t.move_out_date, " +
+                "t.security_deposit, t.tenant_status, t.created_at, " +
+                "p.property_name, r.room_number, COALESCE(t.monthly_rent, r.monthly_rent) AS monthly_rent " +
+                "FROM tenants t " +
+                "LEFT JOIN properties p ON t.property_id = p.property_id " +
+                "LEFT JOIN rooms r ON t.room_id = r.room_id " +
+                "ORDER BY t.tenant_id DESC";
 
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
+                PreparedStatement pstmt = conn.prepareStatement(sql);
+                ResultSet rs = pstmt.executeQuery()) {
 
             while (rs.next()) {
                 list.add(mapRowToTenant(rs));
@@ -146,16 +163,16 @@ public class TenantDAO {
      */
     public Tenant getTenantById(int tenantId) {
         String sql = "SELECT t.tenant_id, t.property_id, t.room_id, t.full_name, t.email, t.phone, " +
-                     "t.emergency_contact, t.id_proof_number, t.move_in_date, t.move_out_date, " +
-                     "t.security_deposit, t.tenant_status, t.created_at, " +
-                     "p.property_name, r.room_number, r.monthly_rent " +
-                     "FROM tenants t " +
-                     "LEFT JOIN properties p ON t.property_id = p.property_id " +
-                     "LEFT JOIN rooms r ON t.room_id = r.room_id " +
-                     "WHERE t.tenant_id = ?";
+                "t.emergency_contact, t.id_proof_number, t.move_in_date, t.move_out_date, " +
+                "t.security_deposit, t.tenant_status, t.created_at, " +
+                "p.property_name, r.room_number, COALESCE(t.monthly_rent, r.monthly_rent) AS monthly_rent " +
+                "FROM tenants t " +
+                "LEFT JOIN properties p ON t.property_id = p.property_id " +
+                "LEFT JOIN rooms r ON t.room_id = r.room_id " +
+                "WHERE t.tenant_id = ?";
 
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setInt(1, tenantId);
 
@@ -179,8 +196,8 @@ public class TenantDAO {
      */
     public boolean updateTenant(Tenant tenant) {
         String updateSql = "UPDATE tenants SET full_name = ?, email = ?, phone = ?, " +
-                           "emergency_contact = ?, id_proof_number = ?, tenant_status = ?, move_out_date = ? " +
-                           "WHERE tenant_id = ?";
+                "emergency_contact = ?, id_proof_number = ?, monthly_rent = ?, tenant_status = ?, move_out_date = ? " +
+                "WHERE tenant_id = ?";
 
         String roomStatusSql = "UPDATE rooms SET room_status = ? WHERE room_id = ?";
 
@@ -197,11 +214,13 @@ public class TenantDAO {
             pstmt.setString(2, tenant.getEmail().trim());
             pstmt.setString(3, tenant.getPhone().trim());
             pstmt.setString(4, tenant.getEmergencyContact() != null ? tenant.getEmergencyContact().trim() : null);
-            String idOrAddress = tenant.getPermanentAddress() != null ? tenant.getPermanentAddress().trim() : tenant.getIdProofNumber();
+            String idOrAddress = tenant.getPermanentAddress() != null ? tenant.getPermanentAddress().trim()
+                    : tenant.getIdProofNumber();
             pstmt.setString(5, idOrAddress);
-            pstmt.setString(6, tenant.getTenantStatus());
-            pstmt.setDate(7, tenant.getMoveOutDate());
-            pstmt.setInt(8, tenant.getTenantId());
+            pstmt.setDouble(6, tenant.getMonthlyRent());
+            pstmt.setString(7, tenant.getTenantStatus());
+            pstmt.setDate(8, tenant.getMoveOutDate());
+            pstmt.setInt(9, tenant.getTenantId());
 
             int affected = pstmt.executeUpdate();
 
@@ -223,18 +242,30 @@ public class TenantDAO {
             return affected > 0;
         } catch (SQLException e) {
             if (conn != null) {
-                try { conn.rollback(); } catch (SQLException ignored) {}
+                try {
+                    conn.rollback();
+                } catch (SQLException ignored) {
+                }
             }
             System.err.println("[TenantDAO] updateTenant failed: " + e.getMessage());
             return false;
         } finally {
-            if (pstmt != null) try { pstmt.close(); } catch (SQLException ignored) {}
-            if (roomStmt != null) try { roomStmt.close(); } catch (SQLException ignored) {}
+            if (pstmt != null)
+                try {
+                    pstmt.close();
+                } catch (SQLException ignored) {
+                }
+            if (roomStmt != null)
+                try {
+                    roomStmt.close();
+                } catch (SQLException ignored) {
+                }
             if (conn != null) {
                 try {
                     conn.setAutoCommit(true);
                     conn.close();
-                } catch (SQLException ignored) {}
+                } catch (SQLException ignored) {
+                }
             }
         }
     }
@@ -277,18 +308,30 @@ public class TenantDAO {
             return affected > 0;
         } catch (SQLException e) {
             if (conn != null) {
-                try { conn.rollback(); } catch (SQLException ignored) {}
+                try {
+                    conn.rollback();
+                } catch (SQLException ignored) {
+                }
             }
             System.err.println("[TenantDAO] deleteTenant failed: " + e.getMessage());
             return false;
         } finally {
-            if (deleteStmt != null) try { deleteStmt.close(); } catch (SQLException ignored) {}
-            if (roomStmt != null) try { roomStmt.close(); } catch (SQLException ignored) {}
+            if (deleteStmt != null)
+                try {
+                    deleteStmt.close();
+                } catch (SQLException ignored) {
+                }
+            if (roomStmt != null)
+                try {
+                    roomStmt.close();
+                } catch (SQLException ignored) {
+                }
             if (conn != null) {
                 try {
                     conn.setAutoCommit(true);
                     conn.close();
-                } catch (SQLException ignored) {}
+                } catch (SQLException ignored) {
+                }
             }
         }
     }
@@ -298,17 +341,19 @@ public class TenantDAO {
      * Enforces the business rule: Target room MUST be Vacant before assignment.
      * If tenant was previously in another room, previous room is freed to 'Vacant'.
      * 
-     * @param tenantId target tenant ID
-     * @param propertyId property ID
-     * @param roomId room ID
+     * @param tenantId    target tenant ID
+     * @param propertyId  property ID
+     * @param roomId      room ID
      * @param monthlyRent monthly rent agreed
-     * @param moveInDate date of moving in
-     * @return true if assignment succeeded, false if room is occupied or update failed
+     * @param moveInDate  date of moving in
+     * @return true if assignment succeeded, false if room is occupied or update
+     *         failed
      */
     public boolean assignProperty(int tenantId, int propertyId, int roomId, double monthlyRent, Date moveInDate) {
         // Check if destination room is vacant
         if (!isRoomVacant(roomId)) {
-            System.err.println("[TenantDAO] Cannot assign room ID " + roomId + ": Room is already Occupied or in Maintenance.");
+            System.err.println(
+                    "[TenantDAO] Cannot assign room ID " + roomId + ": Room is already Occupied or in Maintenance.");
             return false;
         }
 
@@ -320,9 +365,9 @@ public class TenantDAO {
 
         int previousRoomId = existing.getRoomId();
 
-        String assignSql = "UPDATE tenants SET property_id = ?, room_id = ?, move_in_date = ?, " +
-                           "tenant_status = 'Active' WHERE tenant_id = ?";
-        String occupyNewRoomSql = "UPDATE rooms SET room_status = 'Occupied', monthly_rent = ? WHERE room_id = ?";
+        String assignSql = "UPDATE tenants SET property_id = ?, room_id = ?, monthly_rent = ?, move_in_date = ?, " +
+                "tenant_status = 'Active' WHERE tenant_id = ?";
+        String occupyNewRoomSql = "UPDATE rooms SET room_status = 'Occupied' WHERE room_id = ?";
         String freeOldRoomSql = "UPDATE rooms SET room_status = 'Vacant' WHERE room_id = ?";
 
         Connection conn = null;
@@ -334,18 +379,19 @@ public class TenantDAO {
             conn = DBConnection.getConnection();
             conn.setAutoCommit(false);
 
-            // 1. Update Tenant record
+            // 1. Update Tenant record with assigned property, room, and negotiated monthly
+            // rent
             assignStmt = conn.prepareStatement(assignSql);
             assignStmt.setInt(1, propertyId);
             assignStmt.setInt(2, roomId);
-            assignStmt.setDate(3, moveInDate != null ? moveInDate : new Date(System.currentTimeMillis()));
-            assignStmt.setInt(4, tenantId);
+            assignStmt.setDouble(3, monthlyRent);
+            assignStmt.setDate(4, moveInDate != null ? moveInDate : new Date(System.currentTimeMillis()));
+            assignStmt.setInt(5, tenantId);
             assignStmt.executeUpdate();
 
-            // 2. Mark new room Occupied
+            // 2. Mark new room Occupied (preserving original room default rent)
             occupyStmt = conn.prepareStatement(occupyNewRoomSql);
-            occupyStmt.setDouble(1, monthlyRent);
-            occupyStmt.setInt(2, roomId);
+            occupyStmt.setInt(1, roomId);
             occupyStmt.executeUpdate();
 
             // 3. If previous room was different, mark it Vacant
@@ -359,19 +405,35 @@ public class TenantDAO {
             return true;
         } catch (SQLException e) {
             if (conn != null) {
-                try { conn.rollback(); } catch (SQLException ignored) {}
+                try {
+                    conn.rollback();
+                } catch (SQLException ignored) {
+                }
             }
             System.err.println("[TenantDAO] assignProperty transaction failed: " + e.getMessage());
             return false;
         } finally {
-            if (assignStmt != null) try { assignStmt.close(); } catch (SQLException ignored) {}
-            if (occupyStmt != null) try { occupyStmt.close(); } catch (SQLException ignored) {}
-            if (freeStmt != null) try { freeStmt.close(); } catch (SQLException ignored) {}
+            if (assignStmt != null)
+                try {
+                    assignStmt.close();
+                } catch (SQLException ignored) {
+                }
+            if (occupyStmt != null)
+                try {
+                    occupyStmt.close();
+                } catch (SQLException ignored) {
+                }
+            if (freeStmt != null)
+                try {
+                    freeStmt.close();
+                } catch (SQLException ignored) {
+                }
             if (conn != null) {
                 try {
                     conn.setAutoCommit(true);
                     conn.close();
-                } catch (SQLException ignored) {}
+                } catch (SQLException ignored) {
+                }
             }
         }
     }
@@ -385,17 +447,17 @@ public class TenantDAO {
     public ArrayList<Tenant> getTenantsByProperty(int propertyId) {
         ArrayList<Tenant> list = new ArrayList<>();
         String sql = "SELECT t.tenant_id, t.property_id, t.room_id, t.full_name, t.email, t.phone, " +
-                     "t.emergency_contact, t.id_proof_number, t.move_in_date, t.move_out_date, " +
-                     "t.security_deposit, t.tenant_status, t.created_at, " +
-                     "p.property_name, r.room_number, r.monthly_rent " +
-                     "FROM tenants t " +
-                     "LEFT JOIN properties p ON t.property_id = p.property_id " +
-                     "LEFT JOIN rooms r ON t.room_id = r.room_id " +
-                     "WHERE t.property_id = ? " +
-                     "ORDER BY t.tenant_id DESC";
+                "t.emergency_contact, t.id_proof_number, t.move_in_date, t.move_out_date, " +
+                "t.security_deposit, t.tenant_status, t.created_at, " +
+                "p.property_name, r.room_number, COALESCE(t.monthly_rent, r.monthly_rent) AS monthly_rent " +
+                "FROM tenants t " +
+                "LEFT JOIN properties p ON t.property_id = p.property_id " +
+                "LEFT JOIN rooms r ON t.room_id = r.room_id " +
+                "WHERE t.property_id = ? " +
+                "ORDER BY t.tenant_id DESC";
 
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setInt(1, propertyId);
 
@@ -419,7 +481,7 @@ public class TenantDAO {
     public boolean isRoomVacant(int roomId) {
         String sql = "SELECT room_status FROM rooms WHERE room_id = ?";
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setInt(1, roomId);
 
