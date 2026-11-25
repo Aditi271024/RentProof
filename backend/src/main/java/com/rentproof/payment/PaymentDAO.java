@@ -339,13 +339,15 @@ public class PaymentDAO {
     /**
      * Calculates total rent collected from all 'Paid' transactions.
      */
-    public double getTotalRentCollected() {
-        String sql = "SELECT SUM(amount) AS total FROM payments WHERE payment_status = 'Paid'";
+    public double getTotalRentCollected(int landlordId) {
+        String sql = "SELECT COALESCE(SUM(py.amount), 0) AS total FROM payments py "
+                + "JOIN properties pr ON pr.property_id = py.property_id "
+                + "WHERE py.payment_status = 'Paid' AND pr.landlord_id = ?";
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            if (rs.next()) {
-                return rs.getDouble("total");
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, landlordId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return rs.getDouble("total");
             }
         } catch (SQLException e) {
             System.err.println("[PaymentDAO] getTotalRentCollected failed: " + e.getMessage());
@@ -356,29 +358,51 @@ public class PaymentDAO {
     /**
      * Returns count of successful payments (status = 'Paid').
      */
-    public int getSuccessfulPaymentCount() {
-        return getCountByStatus("Paid");
+    public int getSuccessfulPaymentCount(int landlordId) {
+        return getCountByStatus("Paid", landlordId);
     }
 
     /**
      * Returns count of pending payments (status = 'Pending').
      */
-    public int getPendingPaymentCount() {
-        return getCountByStatus("Pending");
+    public int getPendingPaymentCount(int landlordId) {
+        return getCountByStatus("Pending", landlordId);
     }
 
     /**
      * Returns count of overdue payments (status = 'Overdue').
      */
-    public int getOverduePaymentCount() {
-        return getCountByStatus("Overdue");
+    public int getOverduePaymentCount(int landlordId) {
+        return getCountByStatus("Overdue", landlordId);
     }
 
-    private int getCountByStatus(String status) {
-        String sql = "SELECT COUNT(*) AS total FROM payments WHERE payment_status = ?";
+    /**
+     * Calculates the total amount assigned to overdue payments.
+     */
+    public double getOverdueAmount(int landlordId) {
+        String sql = "SELECT COALESCE(SUM(py.amount), 0) AS total FROM payments py "
+                + "JOIN properties pr ON pr.property_id = py.property_id "
+                + "WHERE py.payment_status = 'Overdue' AND pr.landlord_id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, landlordId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return rs.getDouble("total");
+            }
+        } catch (SQLException e) {
+            System.err.println("[PaymentDAO] getOverdueAmount failed: " + e.getMessage());
+        }
+        return 0.0;
+    }
+
+    private int getCountByStatus(String status, int landlordId) {
+        String sql = "SELECT COUNT(*) AS total FROM payments py "
+                + "JOIN properties pr ON pr.property_id = py.property_id "
+                + "WHERE py.payment_status = ? AND pr.landlord_id = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, status);
+            pstmt.setInt(2, landlordId);
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     return rs.getInt("total");

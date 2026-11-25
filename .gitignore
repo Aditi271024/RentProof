@@ -1,5 +1,6 @@
 # Database credentials
 backend/src/main/resources/db.properties
+database/backups/
 
 # Compiled files
 *.class
@@ -7,5 +8,6 @@ bin/
 target/
 
 # IDE files
-.vscode/
+.vscode/*
+!.vscode/launch.json
 .idea/

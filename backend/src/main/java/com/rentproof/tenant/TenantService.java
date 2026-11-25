@@ -169,6 +169,14 @@ public class TenantService {
             return "Tenant with ID " + tenantId + " does not exist.";
         }
 
+        try {
+            if (!tenantDAO.roomBelongsToProperty(roomId, propertyId)) {
+                return "The selected room does not belong to the selected property.";
+            }
+        } catch (SQLException e) {
+            return "Unable to verify that the selected room belongs to the property.";
+        }
+
         // Prevent assigning if room is already occupied
         if (!tenantDAO.isRoomVacant(roomId)) {
             return "The selected room is currently occupied or under maintenance. Please select a vacant room.";
@@ -194,6 +202,10 @@ public class TenantService {
         String validationError = validateTenant(tenant);
         if (validationError != null) {
             throw new IllegalArgumentException(validationError);
+        }
+
+        if (!tenantDAO.roomBelongsToProperty(tenant.getRoomId(), tenant.getPropertyId())) {
+            throw new IllegalArgumentException("The selected room does not belong to the selected property.");
         }
 
         // Ensure target room is not occupied

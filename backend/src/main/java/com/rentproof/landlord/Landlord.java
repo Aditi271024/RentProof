@@ -20,6 +20,8 @@ public class Landlord {
     private String email;
     private String phone;
     private String passwordHash;
+    private String passwordSalt;
+    private int passwordIterations;
     private Timestamp createdAt;
 
     // Default Constructor
@@ -84,6 +86,22 @@ public class Landlord {
 
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    public String getPasswordSalt() {
+        return passwordSalt;
+    }
+
+    public void setPasswordSalt(String passwordSalt) {
+        this.passwordSalt = passwordSalt;
+    }
+
+    public int getPasswordIterations() {
+        return passwordIterations;
+    }
+
+    public void setPasswordIterations(int passwordIterations) {
+        this.passwordIterations = passwordIterations;
     }
 
     public Timestamp getCreatedAt() {

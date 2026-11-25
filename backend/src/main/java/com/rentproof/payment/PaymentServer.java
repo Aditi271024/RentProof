@@ -34,27 +34,7 @@ public class PaymentServer {
     private static final PaymentService paymentService = new PaymentService();
 
     public static void main(String[] args) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
-
-        // API Endpoints
-        server.createContext("/api/payments", new PaymentsHandler());
-        server.createContext("/api/payments/stats", new StatsHandler());
-        server.createContext("/api/payments/add", new AddPaymentHandler());
-        server.createContext("/api/payments/update-status", new UpdateStatusHandler());
-        server.createContext("/api/payments/delete", new DeletePaymentHandler());
-        server.createContext("/api/tenants", new TenantsHandler());
-        server.createContext("/api/properties", new PropertiesHandler());
-        server.createContext("/api/rooms", new RoomsHandler());
-
-        // Static File Serving
-        server.createContext("/", new StaticFileHandler());
-
-        server.setExecutor(null); // default executor
-        System.out.println("============================================================");
-        System.out.println("   RENTPROOF PAYMENT SERVER RUNNING ON PORT " + PORT);
-        System.out.println("   Open in Browser: http://localhost:" + PORT + "/frontend/payments/payments.html");
-        System.out.println("============================================================");
-        server.start();
+        com.rentproof.RentProofServer.main(args);
     }
 
     // ==========================================
@@ -112,7 +92,7 @@ public class PaymentServer {
             }
 
             try {
-                Map<String, Object> stats = paymentService.getDashboardStats();
+                Map<String, Object> stats = paymentService.getDashboardStats(0);
                 String json = String.format(
                         "{\"totalRentCollected\":%.2f,\"successfulPaymentCount\":%d,\"pendingPaymentCount\":%d,\"overduePaymentCount\":%d}",
                         ((Number) stats.get("totalRentCollected")).doubleValue(),
@@ -375,7 +355,8 @@ public class PaymentServer {
     }
 
     private static void addCorsHeaders(HttpExchange exchange) {
-        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        exchange.getResponseHeaders().set("X-Frame-Options", "DENY");
         exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, Authorization");
     }

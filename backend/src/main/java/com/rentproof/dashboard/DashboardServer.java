@@ -27,20 +27,7 @@ public class DashboardServer {
     private static final DashboardService dashboardService = new DashboardService();
 
     public static void main(String[] args) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
-
-        // API Endpoint for Dashboard Analytics
-        server.createContext("/api/dashboard/summary", new DashboardSummaryHandler());
-
-        // Static Web Files Server
-        server.createContext("/", new StaticFileHandler());
-
-        server.setExecutor(null); // default executor
-        System.out.println("============================================================");
-        System.out.println("   RENTPROOF LANDLORD DASHBOARD SERVER RUNNING ON PORT " + PORT);
-        System.out.println("   Open in Browser: http://localhost:" + PORT + "/frontend/dashboard/dashboard.html");
-        System.out.println("============================================================");
-        server.start();
+        com.rentproof.RentProofServer.main(args);
     }
 
     /**
@@ -51,7 +38,8 @@ public class DashboardServer {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             // Enable Cross-Origin Resource Sharing (CORS)
-            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+            exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+            exchange.getResponseHeaders().set("X-Frame-Options", "DENY");
             exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, OPTIONS");
             exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
 
