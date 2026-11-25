@@ -3,8 +3,7 @@
  * Vanilla JavaScript (No Frameworks)
  * 
  * Features:
- * - Dynamic Backend API connectivity with graceful offline localStorage fallback
- * - Seed dataset matching database/rentproof.sql exactly
+ * - Dynamic Backend API connectivity backed by MySQL
  * - Real-time statistics (Total Collected, Successful, Pending, Overdue)
  * - Add Payment workflow with cascading Tenant -> Property -> Room auto-fill
  * - Interactive Real-Time Receipt Preview during payment entry
@@ -156,79 +155,81 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupNavigationAndSidebar();
   setupActiveUser();
 
-  if (document.getElementById("paymentsDashboardView")) {
-    initPaymentsDashboard();
-  } else if (document.getElementById("addPaymentForm")) {
-    initAddPaymentForm();
-  } else if (document.getElementById("paymentHistoryView")) {
-    initPaymentHistory();
+  document.addEventListener("click", handlePaymentActionClick);
+  try {
+    if (document.getElementById("paymentsDashboardView")) {
+      await initPaymentsDashboard();
+    } else if (document.getElementById("addPaymentForm")) {
+      await initAddPaymentForm();
+    } else if (document.getElementById("paymentHistoryView")) {
+      await initPaymentHistory();
+    }
+  } catch (error) {
+    console.error("[PaymentUI] Could not initialize the current page:", error);
+    showToast(error.message || "Could not load payment data.", "error");
   }
 });
 
+function handlePaymentActionClick(event) {
+  const button = event.target.closest("[data-payment-action]");
+  if (!button) return;
+
+  const paymentId = Number(button.dataset.paymentId);
+  switch (button.dataset.paymentAction) {
+    case "receipt":
+      viewPaymentReceipt(paymentId);
+      break;
+    case "status":
+      openStatusModal(paymentId, button.dataset.paymentStatus || "");
+      break;
+    case "delete":
+      confirmDeletePayment(paymentId);
+      break;
+    case "close-receipt":
+      closeReceiptModal();
+      break;
+    case "print-receipt":
+      printReceipt();
+      break;
+    case "close-status":
+      closeStatusModal();
+      break;
+    case "save-status":
+      saveStatusModalChange();
+      break;
+    case "notification":
+      showToast("No new payment notifications.", "info");
+      break;
+  }
+}
+
 /* ==============================================================================
-   DATA ACCESS LAYER (API First with LocalStorage Fallback)
+   DATA ACCESS LAYER (Backend API)
    ============================================================================== */
 
 /**
  * Loads all payments asynchronously from live Java backend API.
  */
 async function loadPayments() {
-  try {
-    const res = await fetch(`${API_BASE}/api/payments`);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        saveLocalPayments(data);
-        return data;
-      }
-    }
-  } catch (err) {
-    console.error("[PaymentAPI] Failed to fetch payments from backend:", err);
-  }
-  return getLocalPayments();
+  const res = await fetch(`${API_BASE}/api/payments`);
+  if (!res.ok) throw new Error("Failed to fetch payments from the backend.");
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error("The backend returned an invalid payments response.");
+  return data;
 }
 
 /**
  * Loads dashboard statistics directly from MySQL aggregation.
  */
 async function loadDashboardStats() {
-  try {
-    const res = await fetch(`${API_BASE}/api/payments/stats`);
-    if (res.ok) {
-      const stats = await res.json();
-      return {
-        totalRentCollected: stats.totalCollected || 0,
-        successfulPaymentCount: stats.successful || 0,
-        pendingPaymentCount: stats.pending || 0,
-        overduePaymentCount: stats.overdue || 0
-      };
-    }
-  } catch (err) {
-    console.error("[PaymentAPI] Failed to fetch stats from backend:", err);
-  }
-
-  const payments = getLocalPayments();
-  let totalCollected = 0;
-  let successful = 0;
-  let pending = 0;
-  let overdue = 0;
-
-  payments.forEach((p) => {
-    if (p.paymentStatus === "Paid") {
-      totalCollected += Number(p.amount) || 0;
-      successful++;
-    } else if (p.paymentStatus === "Pending") {
-      pending++;
-    } else if (p.paymentStatus === "Overdue") {
-      overdue++;
-    }
-  });
-
+  const res = await fetch(`${API_BASE}/api/payments/stats`);
+  if (!res.ok) throw new Error("Failed to fetch payment statistics from the backend.");
+  const stats = await res.json();
   return {
-    totalRentCollected: totalCollected,
-    successfulPaymentCount: successful,
-    pendingPaymentCount: pending,
-    overduePaymentCount: overdue
+    totalRentCollected: stats.totalCollected || 0,
+    successfulPaymentCount: stats.successful || 0,
+    pendingPaymentCount: stats.pending || 0,
+    overduePaymentCount: stats.overdue || 0
   };
 }
 
@@ -236,71 +237,33 @@ async function loadDashboardStats() {
  * Loads active tenants list from live MySQL database.
  */
 async function loadTenants() {
-  try {
-    const res = await fetch(`${API_BASE}/api/tenants`);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) return data;
-    }
-  } catch (err) {
-    console.error("[PaymentAPI] Failed to fetch tenants:", err);
-  }
-  const stored = localStorage.getItem("rentproof_tenants");
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    } catch (e) {}
-  }
-  return [...SEED_TENANTS];
+  const res = await fetch(`${API_BASE}/api/tenants`);
+  if (!res.ok) throw new Error("Failed to fetch tenants from the backend.");
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error("The backend returned an invalid tenants response.");
+  return data;
 }
 
 /**
  * Loads properties list from live MySQL database.
  */
 async function loadProperties() {
-  try {
-    const res = await fetch(`${API_BASE}/api/properties`);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) return data;
-    }
-  } catch (err) {
-    console.error("[PaymentAPI] Failed to fetch properties:", err);
-  }
-  const stored = localStorage.getItem("rentproof_properties");
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    } catch (e) {}
-  }
-  return [...SEED_PROPERTIES];
+  const res = await fetch(`${API_BASE}/api/properties`);
+  if (!res.ok) throw new Error("Failed to fetch properties from the backend.");
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error("The backend returned an invalid properties response.");
+  return data;
 }
 
 /**
  * Loads rooms by property from live MySQL database.
  */
 async function loadRooms(propertyId) {
-  try {
-    const res = await fetch(`${API_BASE}/api/rooms?propertyId=${propertyId}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data)) return data;
-    }
-  } catch (err) {
-    console.error("[PaymentAPI] Failed to fetch rooms:", err);
-  }
-  const stored = localStorage.getItem("rentproof_rooms");
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.filter((r) => Number(r.propertyId) === Number(propertyId));
-      }
-    } catch (e) {}
-  }
-  return SEED_ROOMS.filter((r) => Number(r.propertyId) === Number(propertyId));
+  const res = await fetch(`${API_BASE}/api/rooms?propertyId=${encodeURIComponent(propertyId)}`);
+  if (!res.ok) throw new Error("Failed to fetch rooms from the backend.");
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error("The backend returned an invalid rooms response.");
+  return data;
 }
 
 /**
@@ -319,15 +282,6 @@ async function createPayment(paymentData) {
   }
 
   const generatedId = resp.paymentId;
-  const payments = getLocalPayments();
-  const newRecord = {
-    ...paymentData,
-    paymentId: generatedId,
-    amount: parseFloat(paymentData.amount)
-  };
-  payments.unshift(newRecord);
-  saveLocalPayments(payments);
-
   return { success: true, paymentId: generatedId, backendSynced: true };
 }
 
@@ -346,12 +300,6 @@ async function updatePaymentStatus(paymentId, newStatus) {
     throw new Error(resp.error || "Failed to update payment status in database.");
   }
 
-  const payments = getLocalPayments();
-  const target = payments.find((p) => p.paymentId === paymentId);
-  if (target) {
-    target.paymentStatus = newStatus;
-    saveLocalPayments(payments);
-  }
   return true;
 }
 
@@ -370,28 +318,7 @@ async function deletePayment(paymentId) {
     throw new Error(resp.error || "Failed to delete payment from database.");
   }
 
-  const payments = getLocalPayments();
-  const filtered = payments.filter((p) => p.paymentId !== paymentId);
-  saveLocalPayments(filtered);
   return true;
-}
-
-// LocalStorage helpers
-function getLocalPayments() {
-  const stored = localStorage.getItem("rentproof_payments");
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      console.error("Failed to parse stored payments:", e);
-    }
-  }
-  saveLocalPayments(SEED_PAYMENTS);
-  return [...SEED_PAYMENTS];
-}
-
-function saveLocalPayments(payments) {
-  localStorage.setItem("rentproof_payments", JSON.stringify(payments));
 }
 
 /* ==============================================================================
@@ -451,8 +378,8 @@ async function renderRecentPaymentsTable() {
       <td><span class="badge-status status-${(p.paymentStatus || "").toLowerCase()}">${escapeHtml(p.paymentStatus)}</span></td>
       <td>
         <div class="table-actions">
-          <button class="btn-table-action" onclick="viewPaymentReceipt(${p.paymentId})" title="View Official Receipt">📄 Receipt</button>
-          <button class="btn-table-action" onclick="openStatusModal(${p.paymentId}, '${p.paymentStatus}')" title="Change Status">✏️ Status</button>
+          <button class="btn-table-action" data-payment-action="receipt" data-payment-id="${p.paymentId}" title="View Official Receipt">📄 Receipt</button>
+          <button class="btn-table-action" data-payment-action="status" data-payment-id="${p.paymentId}" data-payment-status="${escapeHtml(p.paymentStatus)}" title="Change Status">✏️ Status</button>
         </div>
       </td>
     </tr>
@@ -469,7 +396,7 @@ let allTenants = [];
 let allProperties = [];
 
 async function initAddPaymentForm() {
-  allTenants = await loadTenants();
+  allTenants = (await loadTenants()).filter((tenant) => tenant.tenantStatus === "Active");
   allProperties = await loadProperties();
 
   // Populate Tenant Dropdown
@@ -930,9 +857,9 @@ function renderHistoryTable() {
       <td><span class="badge-status status-${(p.paymentStatus || "").toLowerCase()}">${escapeHtml(p.paymentStatus)}</span></td>
       <td>
         <div class="table-actions">
-          <button class="btn-table-action" onclick="viewPaymentReceipt(${p.paymentId})" title="View Official Receipt">📄 Receipt</button>
-          <button class="btn-table-action" onclick="openStatusModal(${p.paymentId}, '${p.paymentStatus}')" title="Update Status">✏️</button>
-          <button class="btn-table-action danger" onclick="confirmDeletePayment(${p.paymentId})" title="Delete Payment">🗑️</button>
+          <button class="btn-table-action" data-payment-action="receipt" data-payment-id="${p.paymentId}" title="View Official Receipt">📄 Receipt</button>
+          <button class="btn-table-action" data-payment-action="status" data-payment-id="${p.paymentId}" data-payment-status="${escapeHtml(p.paymentStatus)}" title="Update Status">✏️</button>
+          <button class="btn-table-action danger" data-payment-action="delete" data-payment-id="${p.paymentId}" title="Delete Payment">🗑️</button>
         </div>
       </td>
     </tr>

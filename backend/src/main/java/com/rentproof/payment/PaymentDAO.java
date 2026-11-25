@@ -104,7 +104,7 @@ public class PaymentDAO {
                 list.add(mapRowToPaymentWithDetails(rs));
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getAllPayments failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve payments from the database.", e);
         }
         return list;
     }
@@ -136,7 +136,7 @@ public class PaymentDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getPaymentById failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve payment " + paymentId + " from the database.", e);
         }
         return null;
     }
@@ -297,7 +297,7 @@ public class PaymentDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] searchAndFilterPayments failed: " + e.getMessage());
+            throw new IllegalStateException("Could not search payment records.", e);
         }
         return list;
     }
@@ -327,7 +327,7 @@ public class PaymentDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getRecentPayments failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve recent payments.", e);
         }
         return list;
     }
@@ -350,7 +350,7 @@ public class PaymentDAO {
                 if (rs.next()) return rs.getDouble("total");
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getTotalRentCollected failed: " + e.getMessage());
+            throw new IllegalStateException("Could not calculate collected rent.", e);
         }
         return 0.0;
     }
@@ -390,7 +390,7 @@ public class PaymentDAO {
                 if (rs.next()) return rs.getDouble("total");
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getOverdueAmount failed: " + e.getMessage());
+            throw new IllegalStateException("Could not calculate overdue rent.", e);
         }
         return 0.0;
     }
@@ -409,7 +409,7 @@ public class PaymentDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getCountByStatus(" + status + ") failed: " + e.getMessage());
+            throw new IllegalStateException("Could not calculate payment counts.", e);
         }
         return 0;
     }
@@ -449,7 +449,7 @@ public class PaymentDAO {
                 tenants.add(map);
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getAvailableTenants failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve tenants for payment entry.", e);
         }
         return tenants;
     }
@@ -474,7 +474,7 @@ public class PaymentDAO {
                 properties.add(map);
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getAvailableProperties failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve properties for payment entry.", e);
         }
         return properties;
     }
@@ -503,7 +503,7 @@ public class PaymentDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getRoomsByProperty failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve rooms for payment entry.", e);
         }
         return rooms;
     }

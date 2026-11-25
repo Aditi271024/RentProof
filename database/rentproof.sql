@@ -18,26 +18,15 @@ CREATE DATABASE IF NOT EXISTS rentproof
 
 USE rentproof;
 
--- Disable foreign key checks during schema creation/resets
-SET FOREIGN_KEY_CHECKS = 0;
-
--- Drop tables if already existing (in reverse dependency order)
-DROP TABLE IF EXISTS reminders;
-DROP TABLE IF EXISTS payments;
-DROP TABLE IF EXISTS tenants;
-DROP TABLE IF EXISTS rooms;
-DROP TABLE IF EXISTS properties;
-DROP TABLE IF EXISTS landlords;
-
-SET FOREIGN_KEY_CHECKS = 1;
-
+-- This file is non-destructive. Existing-table column migrations are handled by
+-- DatabaseInitializer when the application starts.
 
 -- ==============================================================================
 -- TABLE 1: landlords
 -- Managed by: Aditi Sharma (Authentication Module)
 -- Purpose: Stores registered landlord user credentials, contact details, and account metadata.
 -- ==============================================================================
-CREATE TABLE landlords (
+CREATE TABLE IF NOT EXISTS landlords (
     landlord_id INT AUTO_INCREMENT PRIMARY KEY,
     full_name VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL,
@@ -58,7 +47,7 @@ CREATE INDEX idx_landlords_email ON landlords(email);
 -- Managed by: Aditi Sharma (Property Management Module)
 -- Purpose: Stores real-estate properties owned by landlords (PGs, Flats, Apartments, Houses).
 -- ==============================================================================
-CREATE TABLE properties (
+CREATE TABLE IF NOT EXISTS properties (
     property_id INT AUTO_INCREMENT PRIMARY KEY,
     landlord_id INT NOT NULL,
     property_name VARCHAR(100) NOT NULL,
@@ -89,7 +78,7 @@ CREATE INDEX idx_properties_type ON properties(property_type);
 -- Purpose: Stores individual rooms within properties (essential for PGs, hostels, and shared flats).
 -- Constraint: Duplicate room numbers inside the same property are strictly forbidden.
 -- ==============================================================================
-CREATE TABLE rooms (
+CREATE TABLE IF NOT EXISTS rooms (
     room_id INT AUTO_INCREMENT PRIMARY KEY,
     property_id INT NOT NULL,
     room_number VARCHAR(20) NOT NULL,
@@ -122,7 +111,9 @@ CREATE TABLE IF NOT EXISTS tenants (
     full_name VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL,
     phone VARCHAR(20) NOT NULL,
+    monthly_rent DECIMAL(10, 2) NULL DEFAULT NULL,
     emergency_contact VARCHAR(20),
+    permanent_address VARCHAR(255) NULL,
     id_proof_number VARCHAR(50),
     move_in_date DATE NOT NULL,
     move_out_date DATE NULL,

@@ -67,13 +67,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupActiveUser();
   setupPropertyPageActions();
 
-  // Detect which page is currently open
-  if (document.getElementById("propertiesGrid")) {
-    initPropertiesDashboard();
-  } else if (document.getElementById("addPropertyForm")) {
-    initAddPropertyForm();
-  } else if (document.getElementById("editPropertyForm")) {
-    initEditPropertyForm();
+  try {
+    if (document.getElementById("propertiesGrid")) {
+      await initPropertiesDashboard();
+    } else if (document.getElementById("addPropertyForm")) {
+      initAddPropertyForm();
+    } else if (document.getElementById("editPropertyForm")) {
+      await initEditPropertyForm();
+    }
+  } catch (error) {
+    console.error("[PropertyUI] Could not initialize the current page:", error);
+    alert(error.message || "Could not load property data.");
   }
 });
 
@@ -83,16 +87,11 @@ let loadedProperties = [];
  * Loads properties directly from the live Core Java / MySQL backend.
  */
 async function fetchPropertiesFromBackend() {
-  const user = JSON.parse(localStorage.getItem("rentproof_user")) || { landlordId: 1 };
-  try {
-    const res = await fetch(`/api/properties?landlordId=${user.landlordId || 1}`);
-    if (res.ok) {
-      loadedProperties = await res.json();
-      return loadedProperties;
-    }
-  } catch (e) {
-    console.error("[PropertyAPI] Error loading properties from server:", e);
-  }
+  const res = await fetch("/api/properties");
+  if (!res.ok) throw new Error("Could not load properties from the backend.");
+  const properties = await res.json();
+  if (!Array.isArray(properties)) throw new Error("The backend returned an invalid properties response.");
+  loadedProperties = properties;
   return loadedProperties;
 }
 

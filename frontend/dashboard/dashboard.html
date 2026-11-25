@@ -106,20 +106,20 @@
             <input 
               type="text" 
               class="nav-search-input" 
+              id="dashboardSearchInput"
               placeholder="Search properties, rooms, or tenants..."
-              oninput="if(event.key === 'Enter'){window.location.href='../properties/properties.html';}"
             >
           </div>
         </div>
 
         <div class="navbar-right">
-          <button class="notification-btn" title="System Notifications" onclick="alert('System Notice: All property room records and rental ledgers are up to date.')">
+          <button class="notification-btn" id="dashboardNotificationsBtn" title="View reminders">
             🔔
             <span class="notification-badge"></span>
           </button>
 
           <!-- Landlord Profile Pill -->
-          <div class="landlord-profile-pill" onclick="alert('Logged in Landlord: Aditi Sharma\nRole: Property Administrator\nBranch: aditi')">
+          <div class="landlord-profile-pill">
             <div class="profile-avatar" id="headerAvatarInitials">AS</div>
             <div class="profile-details">
               <span class="profile-name" id="headerLandlordName">Aditi Sharma</span>

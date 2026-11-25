@@ -240,7 +240,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3>Official Rent Receipt</h3>
-        <button class="modal-close-btn" onclick="closeReceiptModal()">&times;</button>
+        <button class="modal-close-btn" data-payment-action="close-receipt">&times;</button>
       </div>
       <div class="modal-body">
         <div class="official-receipt">
@@ -298,8 +298,8 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeReceiptModal()">Close</button>
-        <button class="btn btn-primary" onclick="printReceipt()">🖨️ Print Receipt</button>
+        <button class="btn btn-secondary" data-payment-action="close-receipt">Close</button>
+        <button class="btn btn-primary" data-payment-action="print-receipt">🖨️ Print Receipt</button>
       </div>
     </div>
   </div>
@@ -311,7 +311,7 @@
     <div class="modal-box" style="max-width: 420px;">
       <div class="modal-header">
         <h3>Update Payment Status</h3>
-        <button class="modal-close-btn" onclick="closeStatusModal()">&times;</button>
+        <button class="modal-close-btn" data-payment-action="close-status">&times;</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
@@ -328,8 +328,8 @@
         </p>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeStatusModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveStatusModalChange()">Save Status</button>
+        <button class="btn btn-secondary" data-payment-action="close-status">Cancel</button>
+        <button class="btn btn-primary" data-payment-action="save-status">Save Status</button>
       </div>
     </div>
   </div>

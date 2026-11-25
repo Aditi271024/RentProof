@@ -72,7 +72,9 @@ public class DatabaseInitializer {
                 + "full_name VARCHAR(100) NOT NULL,"
                 + "email VARCHAR(100) NOT NULL,"
                 + "phone VARCHAR(20) NOT NULL,"
+                + "monthly_rent DECIMAL(10,2) NULL DEFAULT NULL,"
                 + "emergency_contact VARCHAR(20) NULL,"
+                + "permanent_address VARCHAR(255) NULL,"
                 + "id_proof_number VARCHAR(50) NULL,"
                 + "move_in_date DATE NOT NULL,"
                 + "move_out_date DATE NULL,"
@@ -164,15 +166,25 @@ public class DatabaseInitializer {
                 statement.executeUpdate(CREATE_TABLE_SQL[i]);
                 System.out.println("Table ready: " + TABLE_NAMES[i]);
             }
+            ensureColumn(meta, statement, "tenants", "monthly_rent",
+                    "DECIMAL(10,2) NULL DEFAULT NULL");
+            ensureColumn(meta, statement, "tenants", "permanent_address",
+                    "VARCHAR(255) NULL");
         }
     }
 
     private static void ensureLandlordColumn(DatabaseMetaData meta, Statement statement,
                                              String columnName, String columnDefinition)
             throws SQLException {
-        try (ResultSet column = meta.getColumns("rentproof", null, "landlords", columnName)) {
+        ensureColumn(meta, statement, "landlords", columnName, columnDefinition);
+    }
+
+    private static void ensureColumn(DatabaseMetaData meta, Statement statement,
+                                     String tableName, String columnName, String columnDefinition)
+            throws SQLException {
+        try (ResultSet column = meta.getColumns("rentproof", null, tableName, columnName)) {
             if (!column.next()) {
-                statement.executeUpdate("ALTER TABLE landlords ADD COLUMN "
+                statement.executeUpdate("ALTER TABLE " + tableName + " ADD COLUMN "
                         + columnName + " " + columnDefinition);
             }
         }

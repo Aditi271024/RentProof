@@ -4,7 +4,7 @@
 
 Create landlord accounts with the registration page or `POST /api/auth/register`. Choose a unique password locally; account passwords are stored using PBKDF2 and are not included in frontend files or SQL seeds.
 
-For an empty database, run `database/rentproof.sql`, start the application, and register three accounts in order before optionally running `database/rentproof-sample-data.sql`. The sample fixture assumes landlord IDs 1-3. Skip the sample fixtures if those IDs are already in use.
+Start `RentProofServer` to run `DatabaseInitializer`, which creates missing tables and applies additive tenant rent/address migrations while preserving existing rows. The `database/rentproof.sql` schema script no longer drops tables, but it is not a substitute for application migrations. `database/rentproof-sample-data.sql` uses fixed IDs and should only be used with a verified disposable database; never run it against a database containing user records.
 
 ## Database credentials
 
@@ -23,7 +23,7 @@ For deployments behind a TLS-terminating reverse proxy, set `RENTPROOF_HTTPS=tru
 
 ## Database backup
 
-No schema migration is part of the current security fixes. Before any future schema migration, create and verify a backup using the deployment's protected MySQL credentials. Example from PowerShell:
+The tenant fix adds nullable `tenants.monthly_rent` and `tenants.permanent_address` columns and preserves existing rows. Before any future schema migration, create and verify a backup using the deployment's protected MySQL credentials. Example from PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force database\backups

@@ -164,18 +164,25 @@ let cachedProperties = [];
 let cachedRooms = [];
 
 async function syncBackendData() {
-  try {
-    const [tenantsRes, propsRes, roomsRes] = await Promise.all([
-      fetch("/api/tenants"),
-      fetch("/api/properties"),
-      fetch("/api/rooms")
-    ]);
-    if (tenantsRes.ok) cachedTenants = await tenantsRes.json();
-    if (propsRes.ok) cachedProperties = await propsRes.json();
-    if (roomsRes.ok) cachedRooms = await roomsRes.json();
-  } catch (e) {
-    console.error("[TenantStorage] Error syncing with Java MySQL backend:", e);
+  const [tenantsRes, propsRes, roomsRes] = await Promise.all([
+    fetch("/api/tenants"),
+    fetch("/api/properties"),
+    fetch("/api/rooms")
+  ]);
+  if (!tenantsRes.ok || !propsRes.ok || !roomsRes.ok) {
+    throw new Error("Could not load tenant, property, and room data from the backend.");
   }
+  const [tenants, properties, rooms] = await Promise.all([
+    tenantsRes.json(),
+    propsRes.json(),
+    roomsRes.json()
+  ]);
+  if (!Array.isArray(tenants) || !Array.isArray(properties) || !Array.isArray(rooms)) {
+    throw new Error("The backend returned invalid tenant, property, or room data.");
+  }
+  cachedTenants = tenants;
+  cachedProperties = properties;
+  cachedRooms = rooms;
 }
 
 function getStoredTenants() {
@@ -268,7 +275,7 @@ const TenantAPI = {
       phone: tenantData.phone.trim(),
       emergencyContact: tenantData.emergencyContact ? tenantData.emergencyContact.trim() : "",
       permanentAddress: tenantData.permanentAddress ? tenantData.permanentAddress.trim() : "",
-      idProofNumber: tenantData.permanentAddress ? tenantData.permanentAddress.trim() : "ID-NOT-PROVIDED",
+      idProofNumber: tenantData.idProofNumber ? tenantData.idProofNumber.trim() : "",
       moveInDate: tenantData.moveInDate,
       monthlyRent: Number(tenantData.monthlyRent),
       securityDeposit: Number(tenantData.securityDeposit || 0),
@@ -431,9 +438,29 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!(await window.RentProofSecurity.requireSession())) return;
   setupNavigationAndSidebar();
   setupActiveUser();
+  document.addEventListener("click", handleTenantActionClick);
+
+  const globalSearch = document.getElementById("globalTenantSearch");
+  const tenantSearch = document.getElementById("tenantSearchInput");
+  if (globalSearch && tenantSearch) {
+    globalSearch.addEventListener("input", () => {
+      tenantSearch.value = globalSearch.value;
+      renderTenantDashboard();
+    });
+  }
+  const emptyReset = document.getElementById("emptyResetFiltersBtn");
+  const resetFilters = document.getElementById("resetFiltersBtn");
+  if (emptyReset && resetFilters) emptyReset.addEventListener("click", () => resetFilters.click());
+  const notificationButton = document.getElementById("tenantNotificationBtn");
+  if (notificationButton) notificationButton.addEventListener("click", () => showToast("Tenant records are loaded from the backend.", "info"));
 
   // Load live data from MySQL via Core Java REST endpoints
-  await syncBackendData();
+  try {
+    await syncBackendData();
+  } catch (error) {
+    console.error("[TenantUI] Could not load tenant data:", error);
+    showToast(error.message || "Could not load tenant records.", "error");
+  }
 
   // Route to the appropriate page controller
   if (document.getElementById("tenantsTableBody")) {
@@ -446,6 +473,19 @@ document.addEventListener("DOMContentLoaded", async () => {
     initAssignPropertyForm();
   }
 });
+
+function handleTenantActionClick(event) {
+  const button = event.target.closest("[data-tenant-action]");
+  if (!button) return;
+
+  const tenantId = Number(button.dataset.tenantId);
+  if (button.dataset.tenantAction === "view") {
+    openViewTenantModal(tenantId);
+  } else if (button.dataset.tenantAction === "delete") {
+    const tenant = cachedTenants.find((item) => Number(item.tenantId) === tenantId);
+    openDeleteTenantModal(tenantId, tenant ? tenant.fullName : "this tenant");
+  }
+}
 
 // ==========================================
 // 5. TENANTS DASHBOARD CONTROLLER (tenants.html)
@@ -637,13 +677,13 @@ function renderTenantsTable(tenants) {
       </td>
       <td data-label="Actions">
         <div class="table-actions">
-          <button class="btn-action action-view" title="View Full Details" onclick="openViewTenantModal(${t.tenantId})">
+          <button class="btn-action action-view" title="View Full Details" data-tenant-action="view" data-tenant-id="${t.tenantId}">
             👁️
           </button>
           <a href="edit-tenant.html?id=${t.tenantId}" class="btn-action action-edit" title="Edit Tenant">
             ✏️
           </a>
-          <button class="btn-action action-delete" title="Delete Tenant" onclick="openDeleteTenantModal(${t.tenantId}, '${escapeHtml(t.fullName)}')">
+          <button class="btn-action action-delete" title="Delete Tenant" data-tenant-action="delete" data-tenant-id="${t.tenantId}">
             🗑️
           </button>
         </div>

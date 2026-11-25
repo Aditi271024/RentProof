@@ -76,7 +76,7 @@ public class PaymentService {
             return "Please select a valid room.";
         }
 
-        if (payment.getAmount() <= 0.0) {
+        if (!Double.isFinite(payment.getAmount()) || payment.getAmount() <= 0.0) {
             return "Payment amount must be greater than zero.";
         }
 
@@ -185,6 +185,15 @@ public class PaymentService {
         }
         if (!isAllowedStatus(newStatus)) {
             throw new IllegalArgumentException("Invalid status: " + newStatus + ". Allowed: " + ALLOWED_STATUSES);
+        }
+        Payment payment = paymentDAO.getPaymentById(paymentId);
+        if (payment == null) {
+            return false;
+        }
+        payment.setPaymentStatus(newStatus);
+        String validationError = validatePayment(payment);
+        if (validationError != null) {
+            throw new IllegalArgumentException(validationError);
         }
         return paymentDAO.updatePaymentStatus(paymentId, newStatus);
     }

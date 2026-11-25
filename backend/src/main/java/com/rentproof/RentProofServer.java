@@ -405,22 +405,11 @@ public class RentProofServer {
                 p.setMonthlyRent(parseDoubleSafe(data.get("monthlyRent"), 0.0));
                 p.setDescription(data.getOrDefault("description", ""));
 
-                int id = propertyService.addProperty(p, landlordId);
-
-                // Auto-create initial vacant rooms if specified
-                if (id > 0 && p.getTotalRooms() > 0) {
-                    for (int r = 1; r <= p.getTotalRooms(); r++) {
-                        String rNum = "Room " + (r < 10 ? "0" + r : r);
-                        Room newRoom = new Room(id, rNum, p.getMonthlyRent(), "Vacant");
-                        try {
-                            propertyService.addRoom(newRoom);
-                        } catch (Exception ignored) {}
-                    }
-                }
-
-                sendJsonResponse(exchange, 200, "{\"success\":true,\"propertyId\":" + id + ",\"message\":\"Property added successfully to MySQL\"}");
+                int id = propertyService.addPropertyWithInitialRooms(p, landlordId);
+                sendJsonResponse(exchange, 201, "{\"success\":true,\"propertyId\":" + id + ",\"message\":\"Property and initial rooms added successfully to MySQL\"}");
             } catch (IllegalArgumentException e) {
-                sendSafeError(exchange, 400, e);
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
             } catch (SQLException e) {
                 sendSafeError(exchange, 500, e);
             } catch (Exception e) {
@@ -441,12 +430,12 @@ public class RentProofServer {
                 Map<String, String> data = parseBody(body);
 
                 int propId = parseIntSafe(data.get("propertyId"), 0);
-                if (!landlordOwnsProperty(getAuthenticatedLandlordId(exchange), propId)) {
-                    sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to modify this resource.\"}");
-                    return;
-                }
                 if (propId <= 0) {
                     sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"Valid propertyId is required.\"}");
+                    return;
+                }
+                if (!landlordOwnsProperty(getAuthenticatedLandlordId(exchange), propId)) {
+                    sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to modify this resource.\"}");
                     return;
                 }
 
@@ -477,8 +466,11 @@ public class RentProofServer {
                 } else {
                     sendJsonResponse(exchange, 500, "{\"success\":false,\"error\":\"Failed to update property in database.\"}");
                 }
+            } catch (IllegalArgumentException e) {
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
             } catch (Exception e) {
-                sendSafeError(exchange, 400, e);
+                sendSafeError(exchange, 500, e);
             }
         }
     }
@@ -594,7 +586,11 @@ public class RentProofServer {
 
                 int propId = parseIntSafe(data.get("propertyId"), 0);
                 int landlordId = getAuthenticatedLandlordId(exchange);
-                if (propId <= 0 || !landlordOwnsProperty(landlordId, propId)) {
+                if (propId <= 0) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"A valid propertyId is required.\"}");
+                    return;
+                }
+                if (!landlordOwnsProperty(landlordId, propId)) {
                     sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to modify this resource.\"}");
                     return;
                 }
@@ -787,11 +783,19 @@ public class RentProofServer {
                 Tenant t = new Tenant();
                 t.setPropertyId(parseIntSafe(data.get("propertyId"), 0));
                 int landlordId = getAuthenticatedLandlordId(exchange);
+                if (t.getPropertyId() <= 0) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"A valid propertyId is required.\"}");
+                    return;
+                }
                 if (!landlordOwnsProperty(landlordId, t.getPropertyId())) {
                     sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to use this property.\"}");
                     return;
                 }
                 t.setRoomId(parseIntSafe(data.get("roomId"), 0));
+                if (t.getRoomId() <= 0) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"A valid roomId is required.\"}");
+                    return;
+                }
                 if (!roomBelongsToProperty(landlordId, t.getRoomId(), t.getPropertyId())) {
                     sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"The selected room does not belong to this property.\"}");
                     return;
@@ -800,29 +804,31 @@ public class RentProofServer {
                 t.setEmail(data.getOrDefault("email", "").trim());
                 t.setPhone(data.getOrDefault("phone", "").trim());
                 t.setEmergencyContact(data.getOrDefault("emergencyContact", "").trim());
-                t.setIdProofNumber(data.getOrDefault("idProofNumber", data.getOrDefault("permanentAddress", "")).trim());
+                t.setPermanentAddress(data.getOrDefault("permanentAddress", "").trim());
+                t.setIdProofNumber(data.getOrDefault("idProofNumber", "").trim());
+                t.setMonthlyRent(parseDoubleSafe(data.get("monthlyRent"), 0.0));
                 t.setSecurityDeposit(parseDoubleSafe(data.get("securityDeposit"), 0.0));
                 t.setTenantStatus(data.getOrDefault("tenantStatus", "Active").trim());
 
                 String moveInStr = data.get("moveInDate");
-                if (moveInStr != null && !moveInStr.isEmpty()) {
-                    try {
-                        t.setMoveInDate(Date.valueOf(moveInStr.trim()));
-                    } catch (Exception ignored) {
-                        t.setMoveInDate(new Date(System.currentTimeMillis()));
-                    }
-                } else {
-                    t.setMoveInDate(new Date(System.currentTimeMillis()));
+                if (moveInStr == null || moveInStr.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Move-in date is required.");
                 }
+                t.setMoveInDate(Date.valueOf(moveInStr.trim()));
 
                 int generatedId = tenantService.registerTenant(t);
                 t.setTenantId(generatedId);
 
-                sendJsonResponse(exchange, 200, "{\"success\":true,\"tenantId\":" + generatedId + ",\"tenant\":" + tenantToJson(t) + ",\"message\":\"Tenant registered successfully in MySQL\"}");
+                sendJsonResponse(exchange, 201, "{\"success\":true,\"tenantId\":" + generatedId + ",\"tenant\":" + tenantToJson(t) + ",\"message\":\"Tenant registered successfully in MySQL\"}");
             } catch (IllegalArgumentException e) {
-                sendSafeError(exchange, 400, e);
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
             } catch (SQLException e) {
-                sendSafeError(exchange, 500, e);
+                if ("45000".equals(e.getSQLState())) {
+                    sendJsonResponse(exchange, 409, "{\"success\":false,\"error\":\"The selected room is no longer vacant.\"}");
+                } else {
+                    sendSafeError(exchange, 500, e);
+                }
             } catch (Exception e) {
                 sendSafeError(exchange, 500, e);
             }
@@ -873,14 +879,27 @@ public class RentProofServer {
                 if (data.containsKey("email")) t.setEmail(data.get("email").trim());
                 if (data.containsKey("phone")) t.setPhone(data.get("phone").trim());
                 if (data.containsKey("emergencyContact")) t.setEmergencyContact(data.get("emergencyContact").trim());
+                if (data.containsKey("permanentAddress")) t.setPermanentAddress(data.get("permanentAddress").trim());
                 if (data.containsKey("idProofNumber")) t.setIdProofNumber(data.get("idProofNumber").trim());
+                if (data.containsKey("monthlyRent")) t.setMonthlyRent(parseDoubleSafe(data.get("monthlyRent"), t.getMonthlyRent()));
                 if (data.containsKey("securityDeposit")) t.setSecurityDeposit(parseDoubleSafe(data.get("securityDeposit"), t.getSecurityDeposit()));
                 if (data.containsKey("tenantStatus")) t.setTenantStatus(data.get("tenantStatus").trim());
-                if (data.containsKey("propertyId")) t.setPropertyId(parseIntSafe(data.get("propertyId"), t.getPropertyId()));
-                if (data.containsKey("roomId")) t.setRoomId(parseIntSafe(data.get("roomId"), t.getRoomId()));
+                if (targetPropertyId != t.getPropertyId() || targetRoomId != t.getRoomId()) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"Use the room assignment endpoint to change a tenant's property or room.\"}");
+                    return;
+                }
+                if ("Moved Out".equalsIgnoreCase(t.getTenantStatus()) && t.getMoveOutDate() == null) {
+                    t.setMoveOutDate(new Date(System.currentTimeMillis()));
+                } else if ("Active".equalsIgnoreCase(t.getTenantStatus())) {
+                    t.setMoveOutDate(null);
+                }
 
                 boolean ok = tenantService.updateTenant(t);
-                sendJsonResponse(exchange, 200, "{\"success\":" + ok + ",\"message\":\"Tenant updated successfully in MySQL\",\"tenant\":" + tenantToJson(t) + "}");
+                if (!ok) {
+                    sendJsonResponse(exchange, 500, "{\"success\":false,\"error\":\"Tenant update failed in the database.\"}");
+                    return;
+                }
+                sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Tenant updated successfully in MySQL\",\"tenant\":" + tenantToJson(t) + "}");
             } catch (Exception e) {
                 sendSafeError(exchange, 400, e);
             }
@@ -904,19 +923,25 @@ public class RentProofServer {
                     String[] segs = path.split("/");
                     if (segs.length > 3) tenantId = parseIntSafe(segs[3], 0);
                 }
+                if (tenantId <= 0) {
+                    Map<String, String> q = parseQueryParams(exchange.getRequestURI().getQuery());
+                    tenantId = parseIntSafe(q.get("id"), 0);
+                }
+                if (tenantId <= 0) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"A valid tenantId is required.\"}");
+                    return;
+                }
                 if (!landlordOwnsTenant(getAuthenticatedLandlordId(exchange), tenantId)) {
                     sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to modify this resource.\"}");
                     return;
                 }
 
-                if (tenantId <= 0) {
-                    String query = exchange.getRequestURI().getQuery();
-                    Map<String, String> q = parseQueryParams(query);
-                    tenantId = parseIntSafe(q.get("id"), 0);
-                }
-
                 boolean ok = tenantService.deleteTenant(tenantId);
-                sendJsonResponse(exchange, 200, "{\"success\":" + ok + ",\"message\":\"Tenant removed successfully from MySQL. Assigned room is now vacant.\"}");
+                if (!ok) {
+                    sendJsonResponse(exchange, 409, "{\"success\":false,\"error\":\"Tenant could not be deleted. Linked payment records may prevent deletion.\"}");
+                    return;
+                }
+                sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Tenant removed successfully from MySQL. Assigned room is now vacant.\"}");
             } catch (Exception e) {
                 sendSafeError(exchange, 500, e);
             }
@@ -937,6 +962,10 @@ public class RentProofServer {
                 int tenantId = parseIntSafe(data.get("tenantId"), 0);
                 int propertyId = parseIntSafe(data.get("propertyId"), 0);
                 int roomId = parseIntSafe(data.get("roomId"), 0);
+                if (tenantId <= 0 || propertyId <= 0 || roomId <= 0) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"Valid tenantId, propertyId, and roomId are required.\"}");
+                    return;
+                }
                 int landlordId = getAuthenticatedLandlordId(exchange);
                 if (!landlordOwnsTenant(landlordId, tenantId)
                         || !landlordOwnsProperty(landlordId, propertyId)
@@ -946,20 +975,22 @@ public class RentProofServer {
                     return;
                 }
                 double monthlyRent = parseDoubleSafe(data.get("monthlyRent"), 0.0);
-
-                Date moveInDate = new Date(System.currentTimeMillis());
-                if (data.containsKey("moveInDate") && !data.get("moveInDate").isEmpty()) {
-                    try {
-                        moveInDate = Date.valueOf(data.get("moveInDate").trim());
-                    } catch (Exception ignored) {}
+                String moveInValue = data.get("moveInDate");
+                if (moveInValue == null || moveInValue.trim().isEmpty()) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"Move-in date is required.\"}");
+                    return;
                 }
+                Date moveInDate = Date.valueOf(moveInValue.trim());
 
                 boolean ok = tenantService.assignProperty(tenantId, propertyId, roomId, monthlyRent, moveInDate);
                 if (ok) {
                     sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Property assigned successfully to tenant in MySQL\"}");
                 } else {
-                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"Failed to assign property/room in database.\"}");
+                    sendJsonResponse(exchange, 409, "{\"success\":false,\"error\":\"The selected room is no longer available.\"}");
                 }
+            } catch (IllegalArgumentException e) {
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
             } catch (Exception e) {
                 sendSafeError(exchange, 500, e);
             }
@@ -1071,11 +1102,23 @@ public class RentProofServer {
                     sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to use these resources.\"}");
                     return;
                 }
+                if (!tenantAssignedToRoom(p.getTenantId(), p.getPropertyId(), p.getRoomId())) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"The payment tenant, property, and room must match the tenant's current assignment.\"}");
+                    return;
+                }
 
                 int id = paymentService.recordPayment(p);
+                if (id <= 0) {
+                    throw new SQLException("Payment insert did not create a record.");
+                }
                 sendJsonResponse(exchange, 200, "{\"success\":true,\"paymentId\":" + id + ",\"message\":\"Payment recorded successfully in MySQL\"}");
+            } catch (IllegalArgumentException e) {
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
+            } catch (SQLException e) {
+                sendSafeError(exchange, 500, e);
             } catch (Exception e) {
-                sendSafeError(exchange, 400, e);
+                sendSafeError(exchange, 500, e);
             }
         }
     }
@@ -1097,16 +1140,29 @@ public class RentProofServer {
                 Map<String, String> data = parseBody(body);
 
                 int paymentId = parseIntSafe(data.get("paymentId"), 0);
+                if (paymentId <= 0) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"A valid paymentId is required.\"}");
+                    return;
+                }
                 if (!landlordOwnsPayment(getAuthenticatedLandlordId(exchange), paymentId)) {
-                    sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to modify this resource.\"}");
+                    sendJsonResponse(exchange, 404, "{\"success\":false,\"error\":\"Payment not found.\"}");
                     return;
                 }
                 String newStatus = data.getOrDefault("status", "").trim();
 
                 boolean ok = paymentService.updatePaymentStatus(paymentId, newStatus);
-                sendJsonResponse(exchange, 200, "{\"success\":" + ok + ",\"message\":\"Payment status updated in MySQL\"}");
+                if (!ok) {
+                    sendJsonResponse(exchange, 404, "{\"success\":false,\"error\":\"Payment not found.\"}");
+                    return;
+                }
+                sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Payment status updated in MySQL\"}");
+            } catch (IllegalArgumentException e) {
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
+            } catch (SQLException e) {
+                sendSafeError(exchange, 500, e);
             } catch (Exception e) {
-                sendSafeError(exchange, 400, e);
+                sendSafeError(exchange, 500, e);
             }
         }
     }
@@ -1128,14 +1184,27 @@ public class RentProofServer {
                 Map<String, String> data = parseBody(body);
 
                 int paymentId = parseIntSafe(data.get("paymentId"), 0);
+                if (paymentId <= 0) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"A valid paymentId is required.\"}");
+                    return;
+                }
                 if (!landlordOwnsPayment(getAuthenticatedLandlordId(exchange), paymentId)) {
-                    sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to modify this resource.\"}");
+                    sendJsonResponse(exchange, 404, "{\"success\":false,\"error\":\"Payment not found.\"}");
                     return;
                 }
                 boolean ok = paymentService.deletePayment(paymentId);
-                sendJsonResponse(exchange, 200, "{\"success\":" + ok + ",\"message\":\"Payment deleted successfully from MySQL\"}");
+                if (!ok) {
+                    sendJsonResponse(exchange, 404, "{\"success\":false,\"error\":\"Payment not found.\"}");
+                    return;
+                }
+                sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Payment deleted successfully from MySQL\"}");
+            } catch (IllegalArgumentException e) {
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
+            } catch (SQLException e) {
+                sendSafeError(exchange, 500, e);
             } catch (Exception e) {
-                sendSafeError(exchange, 400, e);
+                sendSafeError(exchange, 500, e);
             }
         }
     }
@@ -1231,7 +1300,12 @@ public class RentProofServer {
 
                 Reminder r = new Reminder();
                 r.setLandlordId(getAuthenticatedLandlordId(exchange));
-                int tenantId = parseIntSafe(data.get("tenantId"), 0);
+                String tenantValue = data.get("tenantId");
+                int tenantId = parseIntSafe(tenantValue, 0);
+                if (tenantValue != null && !tenantValue.trim().isEmpty() && tenantId <= 0) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"A valid tenantId is required.\"}");
+                    return;
+                }
                 int landlordId = getAuthenticatedLandlordId(exchange);
                 if (tenantId > 0 && !landlordOwnsTenant(landlordId, tenantId)) {
                     sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to use this tenant.\"}");
@@ -1244,16 +1318,21 @@ public class RentProofServer {
                 r.setReminderStatus(data.getOrDefault("reminderStatus", "Pending").trim());
 
                 String dueStr = data.get("dueDate");
-                if (dueStr != null && !dueStr.trim().isEmpty()) {
-                    r.setDueDate(Date.valueOf(dueStr.trim()));
-                } else {
-                    r.setDueDate(new Date(System.currentTimeMillis()));
+                if (dueStr == null || dueStr.trim().isEmpty()) {
+                    throw new IllegalArgumentException("Due date is required.");
                 }
+                r.setDueDate(reminderService.parseDate(dueStr));
 
                 int id = reminderService.createReminder(r);
-                sendJsonResponse(exchange, 200, "{\"success\":true,\"reminderId\":" + id + ",\"message\":\"Reminder saved successfully in MySQL\"}");
+                if (id <= 0) throw new SQLException("Reminder insert did not return a reminder ID.");
+                sendJsonResponse(exchange, 201, "{\"success\":true,\"reminderId\":" + id + ",\"message\":\"Reminder saved successfully in MySQL\"}");
+            } catch (IllegalArgumentException e) {
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
+            } catch (SQLException e) {
+                sendSafeError(exchange, 500, e);
             } catch (Exception e) {
-                sendSafeError(exchange, 400, e);
+                sendSafeError(exchange, 500, e);
             }
         }
     }
@@ -1290,17 +1369,35 @@ public class RentProofServer {
                 if (data.containsKey("reminderType")) r.setReminderType(data.get("reminderType").trim());
                 if (data.containsKey("reminderStatus")) r.setReminderStatus(data.get("reminderStatus").trim());
                 if (data.containsKey("dueDate") && !data.get("dueDate").trim().isEmpty()) {
-                    r.setDueDate(Date.valueOf(data.get("dueDate").trim()));
+                    r.setDueDate(reminderService.parseDate(data.get("dueDate")));
                 }
                 if (data.containsKey("tenantId")) {
-                    int tid = parseIntSafe(data.get("tenantId"), 0);
+                    String tenantValue = data.get("tenantId").trim();
+                    int tid = parseIntSafe(tenantValue, 0);
+                    if (!tenantValue.isEmpty() && tid <= 0) {
+                        sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"A valid tenantId is required.\"}");
+                        return;
+                    }
+                    if (tid > 0 && !landlordOwnsTenant(getAuthenticatedLandlordId(exchange), tid)) {
+                        sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to use this tenant.\"}");
+                        return;
+                    }
                     r.setTenantId(tid > 0 ? tid : null);
                 }
 
                 boolean ok = reminderService.updateReminder(r);
-                sendJsonResponse(exchange, 200, "{\"success\":" + ok + ",\"message\":\"Reminder updated successfully in MySQL\"}");
+                if (!ok) {
+                    sendJsonResponse(exchange, 404, "{\"success\":false,\"error\":\"Reminder not found.\"}");
+                    return;
+                }
+                sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Reminder updated successfully in MySQL\"}");
+            } catch (IllegalArgumentException e) {
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
+            } catch (SQLException e) {
+                sendSafeError(exchange, 500, e);
             } catch (Exception e) {
-                sendSafeError(exchange, 400, e);
+                sendSafeError(exchange, 500, e);
             }
         }
     }
@@ -1322,14 +1419,24 @@ public class RentProofServer {
                 Map<String, String> data = parseBody(body);
 
                 int reminderId = parseIntSafe(data.get("reminderId"), 0);
+                if (reminderId <= 0) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"A valid reminderId is required.\"}");
+                    return;
+                }
                 if (!landlordOwnsReminder(getAuthenticatedLandlordId(exchange), reminderId)) {
-                    sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to modify this resource.\"}");
+                    sendJsonResponse(exchange, 404, "{\"success\":false,\"error\":\"Reminder not found.\"}");
                     return;
                 }
                 boolean ok = reminderService.deleteReminder(reminderId);
-                sendJsonResponse(exchange, 200, "{\"success\":" + ok + ",\"message\":\"Reminder deleted successfully from MySQL\"}");
+                if (!ok) {
+                    sendJsonResponse(exchange, 404, "{\"success\":false,\"error\":\"Reminder not found.\"}");
+                    return;
+                }
+                sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Reminder deleted successfully from MySQL\"}");
+            } catch (SQLException e) {
+                sendSafeError(exchange, 500, e);
             } catch (Exception e) {
-                sendSafeError(exchange, 400, e);
+                sendSafeError(exchange, 500, e);
             }
         }
     }
@@ -1346,8 +1453,12 @@ public class RentProofServer {
                 Map<String, String> data = parseBody(body);
 
                 int reminderId = parseIntSafe(data.get("reminderId"), 0);
+                if (reminderId <= 0) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"A valid reminderId is required.\"}");
+                    return;
+                }
                 if (!landlordOwnsReminder(getAuthenticatedLandlordId(exchange), reminderId)) {
-                    sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to modify this resource.\"}");
+                    sendJsonResponse(exchange, 404, "{\"success\":false,\"error\":\"Reminder not found.\"}");
                     return;
                 }
                 Reminder r = reminderService.getReminderById(reminderId);
@@ -1358,9 +1469,18 @@ public class RentProofServer {
 
                 String newStatus = "Completed".equalsIgnoreCase(r.getReminderStatus()) ? "Pending" : "Completed";
                 boolean ok = reminderService.updateStatus(reminderId, newStatus);
-                sendJsonResponse(exchange, 200, "{\"success\":" + ok + ",\"newStatus\":\"" + newStatus + "\",\"message\":\"Status toggled successfully in MySQL\"}");
+                if (!ok) {
+                    sendJsonResponse(exchange, 404, "{\"success\":false,\"error\":\"Reminder not found.\"}");
+                    return;
+                }
+                sendJsonResponse(exchange, 200, "{\"success\":true,\"newStatus\":\"" + newStatus + "\",\"message\":\"Status toggled successfully in MySQL\"}");
+            } catch (IllegalArgumentException e) {
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
+            } catch (SQLException e) {
+                sendSafeError(exchange, 500, e);
             } catch (Exception e) {
-                sendSafeError(exchange, 400, e);
+                sendSafeError(exchange, 500, e);
             }
         }
     }
@@ -1736,6 +1856,19 @@ public class RentProofServer {
                 "SELECT 1 FROM tenants t JOIN properties p ON p.property_id = t.property_id "
               + "WHERE t.tenant_id = ? AND p.landlord_id = ?",
                 tenantId, landlordId);
+    }
+
+    private static boolean tenantAssignedToRoom(int tenantId, int propertyId, int roomId) throws SQLException {
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(
+                     "SELECT 1 FROM tenants WHERE tenant_id = ? AND property_id = ? AND room_id = ?")) {
+            pstmt.setInt(1, tenantId);
+            pstmt.setInt(2, propertyId);
+            pstmt.setInt(3, roomId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next();
+            }
+        }
     }
 
     private static boolean landlordOwnsPayment(int landlordId, int paymentId) {

@@ -5,7 +5,7 @@
  * 
  * Features:
  * - Pure Vanilla JavaScript (No React, Vue, or Angular)
- * - Reactive reminder catalog management with localStorage persistence
+ * - Reminder records read and written through the authenticated backend
  * - Synchronized with MySQL 'reminders' and 'tenants' schema
  * - Real-time dynamic search by title, tenant name, message, and type
  * - Filter tabs: All, Pending, Upcoming, Overdue, Completed, Maintenance
@@ -118,27 +118,6 @@ const SEED_REMINDERS = [
   }
 ];
 
-const SEED_ACTIVITIES = [
-  {
-    id: 1,
-    icon: "🔔",
-    text: "Created reminder <strong>'Upcoming December Rent Due'</strong> for <strong>Rohan Verma</strong>",
-    time: "2 hours ago"
-  },
-  {
-    id: 2,
-    icon: "✅",
-    text: "Marked reminder <strong>'November Rental Receipt Recorded'</strong> as <strong>Completed</strong>",
-    time: "Yesterday at 4:30 PM"
-  },
-  {
-    id: 3,
-    icon: "⚠️",
-    text: "Automated alert: Reminder <strong>'AC Servicing Fee Pending'</strong> is now <strong>Overdue</strong>",
-    time: "3 days ago"
-  }
-];
-
 // Active State
 let currentTabFilter = "ALL";
 let currentSearchQuery = "";
@@ -153,26 +132,41 @@ let cachedReminders = [];
 let cachedTenants = [];
 
 async function syncReminderBackendData() {
-  const user = JSON.parse(localStorage.getItem("rentproof_user")) || { landlordId: 1 };
-  try {
-    const [remRes, tenRes] = await Promise.all([
-      fetch(`/api/reminders?landlordId=${user.landlordId || 1}`),
-      fetch("/api/tenants")
-    ]);
-    if (remRes.ok) cachedReminders = await remRes.json();
-    if (tenRes.ok) cachedTenants = await tenRes.json();
-  } catch (e) {
-    console.error("[ReminderStorage] Error syncing with Java MySQL backend:", e);
+  const [remRes, tenRes] = await Promise.all([
+    fetch("/api/reminders"),
+    fetch("/api/tenants")
+  ]);
+  if (!remRes.ok || !tenRes.ok) {
+    throw new Error("Could not load reminders and tenants from the backend.");
   }
+  const reminders = await remRes.json();
+  const tenants = await tenRes.json();
+  if (!Array.isArray(reminders) || !Array.isArray(tenants)) {
+    throw new Error("The backend returned invalid reminder data.");
+  }
+  cachedReminders = reminders;
+  cachedTenants = tenants;
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
   if (!(await window.RentProofSecurity.requireSession())) return;
   setupNavigationAndSidebar();
   setupActiveUser();
+  document.addEventListener("click", handleReminderActionClick);
+  const notificationButton = document.getElementById("reminderNotificationBtn");
+  if (notificationButton) {
+    notificationButton.addEventListener("click", () => {
+      showToast("Reminder records are loaded from the backend.", "info");
+    });
+  }
 
   // Load live reminders and tenants from MySQL
-  await syncReminderBackendData();
+  try {
+    await syncReminderBackendData();
+  } catch (error) {
+    console.error("[ReminderUI] Could not load reminder data:", error);
+    showToast(error.message || "Could not load reminder records.", "error");
+  }
 
   // Route page actions based on active element
   if (document.getElementById("remindersTableBody")) {
@@ -183,6 +177,39 @@ document.addEventListener("DOMContentLoaded", async () => {
     initEditReminderPage();
   }
 });
+
+function handleReminderActionClick(event) {
+  const button = event.target.closest("[data-reminder-action]");
+  if (!button) return;
+
+  const reminderId = Number(button.dataset.reminderId);
+  switch (button.dataset.reminderAction) {
+    case "toggle":
+      toggleReminderStatus(reminderId);
+      break;
+    case "send":
+      openSendNoticeModal(reminderId);
+      break;
+    case "view":
+      openViewModal(reminderId);
+      break;
+    case "delete":
+      openDeleteModal(reminderId);
+      break;
+    case "close-view":
+      closeViewModal();
+      break;
+    case "close-delete":
+      closeDeleteModal();
+      break;
+    case "confirm-delete":
+      confirmExecuteDelete();
+      break;
+    case "close-notice":
+      closeSendNoticeModal();
+      break;
+  }
+}
 
 // =============================================================================
 // DATA ACCESS LAYER (Live MySQL via Core Java REST endpoints)
@@ -209,8 +236,7 @@ function getActivities() {
       console.error("Error parsing activities:", e);
     }
   }
-  localStorage.setItem("rentproof_reminder_activities", JSON.stringify(SEED_ACTIVITIES));
-  return [...SEED_ACTIVITIES];
+  return [];
 }
 
 function logActivity(icon, text) {
@@ -497,7 +523,8 @@ function renderRemindersTable() {
             <button 
               class="action-btn btn-complete" 
               title="${isComp ? 'Reopen (Mark as Pending)' : 'Mark as Completed'}" 
-              onclick="toggleReminderStatus(${r.reminderId})"
+              data-reminder-action="toggle"
+              data-reminder-id="${r.reminderId}"
             >
               ${isComp ? '↩️' : '✓'}
             </button>
@@ -506,7 +533,8 @@ function renderRemindersTable() {
             <button 
               class="action-btn btn-send" 
               title="Dispatch Notice to Tenant" 
-              onclick="openSendNoticeModal(${r.reminderId})"
+              data-reminder-action="send"
+              data-reminder-id="${r.reminderId}"
             >
               📤
             </button>
@@ -515,7 +543,8 @@ function renderRemindersTable() {
             <button 
               class="action-btn" 
               title="View Full Details" 
-              onclick="openViewModal(${r.reminderId})"
+              data-reminder-action="view"
+              data-reminder-id="${r.reminderId}"
             >
               👁️
             </button>
@@ -534,7 +563,8 @@ function renderRemindersTable() {
             <button 
               class="action-btn btn-delete" 
               title="Delete Reminder" 
-              onclick="openDeleteModal(${r.reminderId})"
+              data-reminder-action="delete"
+              data-reminder-id="${r.reminderId}"
             >
               🗑️
             </button>

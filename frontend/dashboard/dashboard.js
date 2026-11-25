@@ -5,7 +5,7 @@
  * 
  * Features:
  * - Real-time statistics aggregation directly from MySQL via JDBC API (/api/dashboard/summary)
- * - Seamless fallback to verified database seed records when opened offline (file://)
+ * - Explicit connection status when the backend is unavailable
  * - Welcome greeting with active Landlord session and live date formatting
  * - Dynamic Property room breakdown (Total, Occupied, Vacant)
  * - Recent payments audit table & Pending rent collections
@@ -13,108 +13,24 @@
  * - Full responsive sidebar state persistence
  */
 
-// Offline fallback records are presentation-only; the server session remains authoritative.
-const FALLBACK_SEED = {
-  landlord: {
-    landlordId: 1,
-    fullName: "Landlord",
-    email: ""
-  },
-  properties: [
-    {
-      propertyId: 1,
-      propertyName: "Sunrise Executive PG",
-      propertyType: "PG",
-      location: "Greater Noida, Uttar Pradesh",
-      totalRooms: 6,
-      occupiedRooms: 4,
-      vacantRooms: 1
-    },
-    {
-      propertyId: 2,
-      propertyName: "Ivory Heights 3BHK Flat",
-      propertyType: "Flat",
-      location: "Noida, Uttar Pradesh",
-      totalRooms: 3,
-      occupiedRooms: 2,
-      vacantRooms: 1
-    },
-    {
-      propertyId: 3,
-      propertyName: "Blue Ridge Residency",
-      propertyType: "Apartment",
-      location: "Noida, Uttar Pradesh",
-      totalRooms: 4,
-      occupiedRooms: 1,
-      vacantRooms: 3
-    }
-  ],
-  recentPayments: [
-    {
-      paymentId: 1,
-      tenantName: "Rohan Verma",
-      propertyName: "Sunrise Executive PG",
-      amount: 8500.00,
-      paymentDate: "2026-11-05",
-      paymentMonth: "November 2026",
-      paymentStatus: "Paid"
-    },
-    {
-      paymentId: 2,
-      tenantName: "Ankit Mishra",
-      propertyName: "Sunrise Executive PG",
-      amount: 8500.00,
-      paymentDate: "2026-11-04",
-      paymentMonth: "November 2026",
-      paymentStatus: "Paid"
-    },
-    {
-      paymentId: 3,
-      tenantName: "Sneha Kapoor",
-      propertyName: "Ivory Heights 3BHK Flat",
-      amount: 11000.00,
-      paymentDate: "2026-11-02",
-      paymentMonth: "November 2026",
-      paymentStatus: "Paid"
-    }
-  ],
-  pendingRent: [
-    {
-      paymentId: 4,
-      tenantName: "Pooja Hegde (Tenant Account)",
-      propertyName: "Blue Ridge Residency",
-      amount: 8500.00,
-      paymentDate: "2026-11-20",
-      paymentMonth: "November 2026",
-      paymentStatus: "Pending"
-    }
-  ],
-  reminders: [
-    {
-      reminderId: 1,
-      title: "Upcoming Rental Due",
-      relatedTo: "Rohan Verma",
-      dueDate: "2026-12-05",
-      reminderType: "Rent Due",
-      reminderStatus: "Pending"
-    },
-    {
-      reminderId: 2,
-      title: "Bi-annual Fire Extinguisher Inspection",
-      relatedTo: "Sunrise Executive PG",
-      dueDate: "2026-11-30",
-      reminderType: "Maintenance",
-      reminderStatus: "Pending"
-    }
-  ]
-};
-
 document.addEventListener("DOMContentLoaded", async () => {
   if (!(await window.RentProofSecurity.requireSession())) return;
   setupNavigationAndSidebar();
   setupActiveUser();
   displayLiveDate();
-  loadDashboardData();
+  const searchInput = document.getElementById("dashboardSearchInput");
+  if (searchInput) {
+    searchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") window.location.href = "../properties/properties.html";
+    });
+  }
+  const notificationsButton = document.getElementById("dashboardNotificationsBtn");
+  if (notificationsButton) {
+    notificationsButton.addEventListener("click", () => {
+      window.location.href = "../reminders/reminders.html";
+    });
+  }
+  await loadDashboardData();
 });
 
 /**
@@ -184,68 +100,40 @@ function displayLiveDate() {
 }
 
 /**
- * Fetches dashboard analytics from Java backend or loads verified database seeds.
+ * Fetches dashboard analytics from the authenticated Java backend.
  */
 async function loadDashboardData() {
-  const user = JSON.parse(localStorage.getItem("rentproof_user")) || { landlordId: 1 };
-  const landlordId = user.landlordId || 1;
-
   try {
     const response = await fetch("/api/dashboard/summary", {
-        credentials: "same-origin",
+      credentials: "same-origin",
       headers: { "Accept": "application/json" }
     });
-
-    if (response.ok) {
-      const data = await response.json();
-      console.log("[Dashboard] Live MySQL JDBC data received:", data);
-      renderDashboard(data.stats, data.properties, data.recentPayments, data.pendingRent, data.reminders, true);
-      return;
-    }
-  } catch (err) {
-    console.info("[Dashboard] Backend HTTP server offline or running via file:// protocol. Using database seed dataset.", err);
+    if (!response.ok) throw new Error(`Dashboard API returned HTTP ${response.status}.`);
+    const data = await response.json();
+    if (!data.success || !data.stats) throw new Error("Dashboard API returned an invalid response.");
+    renderDashboard(data.stats, data.properties, data.recentPayments, data.pendingRent, data.reminders, true);
+  } catch (error) {
+    console.error("[Dashboard] Failed to load live dashboard data:", error);
+    const modeEl = document.getElementById("connectionModeText");
+    if (modeEl) modeEl.textContent = "Database unavailable";
+    [
+      "statTotalProperties",
+      "statTotalRooms",
+      "statOccupiedRooms",
+      "statTotalTenants",
+      "statRentCollected",
+      "statPendingRent"
+    ].forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) element.textContent = "N/A";
+    });
+    ["propertiesTableBody", "recentPaymentsBody", "pendingRentBody"].forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) element.textContent = "Dashboard data is unavailable.";
+    });
+    const reminders = document.getElementById("remindersListContainer");
+    if (reminders) reminders.textContent = "Dashboard data is unavailable.";
   }
-
-  // Calculate stats dynamically from seed
-  const totalProperties = FALLBACK_SEED.properties.length;
-  let totalRooms = 0;
-  let occupiedRooms = 0;
-  let vacantRooms = 0;
-  FALLBACK_SEED.properties.forEach(p => {
-    totalRooms += p.totalRooms;
-    occupiedRooms += p.occupiedRooms;
-    vacantRooms += p.vacantRooms;
-  });
-
-  const totalTenants = 3; // From database/rentproof.sql seed
-  let rentCollected = 0;
-  FALLBACK_SEED.recentPayments.forEach(p => {
-    if (p.paymentStatus === "Paid") rentCollected += p.amount;
-  });
-
-  let pendingRent = 0;
-  FALLBACK_SEED.pendingRent.forEach(p => {
-    pendingRent += p.amount;
-  });
-
-  const stats = {
-    totalProperties,
-    totalRooms,
-    occupiedRooms,
-    vacantRooms,
-    totalTenants,
-    rentCollected,
-    pendingRent
-  };
-
-  renderDashboard(
-    stats,
-    FALLBACK_SEED.properties,
-    FALLBACK_SEED.recentPayments,
-    FALLBACK_SEED.pendingRent,
-    FALLBACK_SEED.reminders,
-    false
-  );
 }
 
 /**
