@@ -33,6 +33,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
+import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.nio.charset.StandardCharsets;
@@ -68,6 +72,7 @@ public class RentProofServer {
     public static final int PORT = 8080;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
     private static final ConcurrentHashMap<String, LoginAttempt> LOGIN_ATTEMPTS = new ConcurrentHashMap<>();
+    private static final int MAX_LOGIN_ATTEMPTS = 10_000;
 
     // Service Layer Singletons
     private static final AuthService authService = new AuthService();
@@ -171,11 +176,7 @@ public class RentProofServer {
         public void handle(HttpExchange exchange) throws IOException {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
-
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendJsonResponse(exchange, 405, "{\"success\":false,\"error\":\"Method Not Allowed\"}");
-                return;
-            }
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -183,8 +184,23 @@ public class RentProofServer {
 
                 String email = data.getOrDefault("email", "").trim();
                 String password = data.getOrDefault("password", "");
+                String validationError = authService.validateLogin(email, password);
+                if (validationError != null) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                            + escapeJson(validationError) + "\"}");
+                    return;
+                }
 
-                LoginAttempt attempt = LOGIN_ATTEMPTS.computeIfAbsent(email.toLowerCase(), key -> new LoginAttempt());
+                String normalizedEmail = email.toLowerCase(java.util.Locale.ROOT);
+                if (LOGIN_ATTEMPTS.size() >= MAX_LOGIN_ATTEMPTS) {
+                    purgeExpiredLoginAttempts();
+                    if (LOGIN_ATTEMPTS.size() >= MAX_LOGIN_ATTEMPTS) {
+                        sendJsonResponse(exchange, 429,
+                                "{\"success\":false,\"error\":\"Too many login attempts. Please try again later.\"}");
+                        return;
+                    }
+                }
+                LoginAttempt attempt = LOGIN_ATTEMPTS.computeIfAbsent(normalizedEmail, key -> new LoginAttempt());
                 if (attempt.isLocked()) {
                     sendJsonResponse(exchange, 429, "{\"success\":false,\"error\":\"Too many attempts. Please try again later.\"}");
                     return;
@@ -192,7 +208,7 @@ public class RentProofServer {
 
                 Landlord landlord = authService.login(email, password);
                 if (landlord != null) {
-                    LOGIN_ATTEMPTS.remove(email.toLowerCase());
+                    LOGIN_ATTEMPTS.remove(normalizedEmail);
                     String token = SessionManager.createSession(landlord.getLandlordId(), landlord.getEmail());
                     exchange.getResponseHeaders().add("Set-Cookie",
                             "rentproof_session=" + token + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=1800"
@@ -219,11 +235,7 @@ public class RentProofServer {
         public void handle(HttpExchange exchange) throws IOException {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
-
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendJsonResponse(exchange, 405, "{\"success\":false,\"error\":\"Method Not Allowed\"}");
-                return;
-            }
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -241,12 +253,21 @@ public class RentProofServer {
                         landlord.getLandlordId(), escapeJson(landlord.getFullName()),
                         escapeJson(landlord.getEmail()), escapeJson(landlord.getPhone())
                 );
-                sendJsonResponse(exchange, 200, json);
+                sendJsonResponse(exchange, 201, json);
+            } catch (AuthService.DuplicateAccountException e) {
+                sendJsonResponse(exchange, 409, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
             } catch (IllegalArgumentException e) {
-                sendSafeError(exchange, 400, e);
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
             } catch (SQLException e) {
                 System.err.println("[AuthRegisterHandler] Registration database operation failed.");
-                sendJsonResponse(exchange, 500, "{\"success\":false,\"error\":\"Unable to complete registration.\"}");
+                if (e.getErrorCode() == 1062 || "23000".equals(e.getSQLState())) {
+                    sendJsonResponse(exchange, 409,
+                            "{\"success\":false,\"error\":\"An account with this email already exists.\"}");
+                } else {
+                    sendJsonResponse(exchange, 500, "{\"success\":false,\"error\":\"Unable to complete registration.\"}");
+                }
             } catch (Exception e) {
                 System.err.println("[AuthRegisterHandler] Registration request failed: " + e.getClass().getSimpleName());
                 sendJsonResponse(exchange, 500, "{\"success\":false,\"error\":\"Unable to complete registration.\"}");
@@ -259,10 +280,7 @@ public class RentProofServer {
         public void handle(HttpExchange exchange) throws IOException {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendJsonResponse(exchange, 405, "{\"success\":false,\"error\":\"Method Not Allowed\"}");
-                return;
-            }
+            if (!requireMethod(exchange, "POST")) return;
             SessionManager.invalidate(getSessionToken(exchange));
             exchange.getResponseHeaders().add("Set-Cookie",
                     "rentproof_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0"
@@ -279,10 +297,7 @@ public class RentProofServer {
         public void handle(HttpExchange exchange) throws IOException {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
-            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendJsonResponse(exchange, 405, "{\"success\":false,\"error\":\"Method Not Allowed\"}");
-                return;
-            }
+            if (!requireMethod(exchange, "GET")) return;
 
             byte[] tokenBytes = new byte[32];
             SECURE_RANDOM.nextBytes(tokenBytes);
@@ -299,25 +314,27 @@ public class RentProofServer {
         public void handle(HttpExchange exchange) throws IOException {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
-            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendJsonResponse(exchange, 405, "{\"success\":false,\"error\":\"Method Not Allowed\"}");
-                return;
+            if (!requireMethod(exchange, "GET")) return;
+            try {
+                Integer landlordId = getAuthenticatedLandlordId(exchange);
+                if (landlordId == null) {
+                    sendJsonResponse(exchange, 401, "{\"success\":false,\"error\":\"Authentication required.\"}");
+                    return;
+                }
+                Landlord landlord = new com.rentproof.landlord.LandlordDAO().getLandlordById(landlordId);
+                if (landlord == null) {
+                    SessionManager.invalidate(getSessionToken(exchange));
+                    sendJsonResponse(exchange, 401, "{\"success\":false,\"error\":\"Authentication required.\"}");
+                    return;
+                }
+                String json = String.format(
+                        "{\"success\":true,\"landlord\":{\"landlordId\":%d,\"fullName\":\"%s\",\"email\":\"%s\",\"phone\":\"%s\"}}",
+                        landlord.getLandlordId(), escapeJson(landlord.getFullName()),
+                        escapeJson(landlord.getEmail()), escapeJson(landlord.getPhone()));
+                sendJsonResponse(exchange, 200, json);
+            } catch (Exception e) {
+                sendSafeError(exchange, 500, e);
             }
-            Integer landlordId = getAuthenticatedLandlordId(exchange);
-            if (landlordId == null) {
-                sendJsonResponse(exchange, 401, "{\"success\":false,\"error\":\"Authentication required.\"}");
-                return;
-            }
-            Landlord landlord = new com.rentproof.landlord.LandlordDAO().getLandlordById(landlordId);
-            if (landlord == null) {
-                sendJsonResponse(exchange, 401, "{\"success\":false,\"error\":\"Authentication required.\"}");
-                return;
-            }
-            String json = String.format(
-                    "{\"success\":true,\"landlord\":{\"landlordId\":%d,\"fullName\":\"%s\",\"email\":\"%s\",\"phone\":\"%s\"}}",
-                    landlord.getLandlordId(), escapeJson(landlord.getFullName()),
-                    escapeJson(landlord.getEmail()), escapeJson(landlord.getPhone()));
-            sendJsonResponse(exchange, 200, json);
         }
     }
 
@@ -331,6 +348,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "GET", "POST", "PUT", "DELETE")) return;
 
             try {
                 String method = exchange.getRequestMethod();
@@ -372,8 +390,6 @@ public class RentProofServer {
                     new UpdatePropertyHandler().handle(exchange);
                 } else if ("DELETE".equalsIgnoreCase(method)) {
                     new DeletePropertyHandler().handle(exchange);
-                } else {
-                    sendJsonResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
                 }
             } catch (Exception e) {
                 sendSafeError(exchange, 500, e);
@@ -387,6 +403,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -424,6 +441,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "POST", "PUT")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -434,11 +452,6 @@ public class RentProofServer {
                     sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"Valid propertyId is required.\"}");
                     return;
                 }
-                if (!landlordOwnsProperty(getAuthenticatedLandlordId(exchange), propId)) {
-                    sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to modify this resource.\"}");
-                    return;
-                }
-
                 Property p = propertyService.getPropertyById(propId);
                 if (p == null) {
                     sendJsonResponse(exchange, 404, "{\"success\":false,\"error\":\"Property not found in MySQL.\"}");
@@ -481,6 +494,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "POST", "DELETE")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -527,6 +541,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "GET")) return;
 
             try {
                 String query = exchange.getRequestURI().getQuery();
@@ -579,6 +594,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -617,6 +633,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -659,6 +676,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -691,6 +709,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "GET", "POST", "PUT", "DELETE")) return;
 
             String method = exchange.getRequestMethod();
             String path = exchange.getRequestURI().getPath();
@@ -760,8 +779,6 @@ public class RentProofServer {
                     new UpdateTenantHandler().handle(exchange);
                 } else if ("DELETE".equalsIgnoreCase(method)) {
                     new DeleteTenantHandler().handle(exchange);
-                } else {
-                    sendJsonResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
                 }
             } catch (Exception e) {
                 sendSafeError(exchange, 500, e);
@@ -775,6 +792,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -841,6 +859,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "POST", "PUT")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -900,8 +919,11 @@ public class RentProofServer {
                     return;
                 }
                 sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Tenant updated successfully in MySQL\",\"tenant\":" + tenantToJson(t) + "}");
+            } catch (IllegalArgumentException e) {
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
             } catch (Exception e) {
-                sendSafeError(exchange, 400, e);
+                sendSafeError(exchange, 500, e);
             }
         }
     }
@@ -912,6 +934,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "POST", "DELETE")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -954,6 +977,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -1007,6 +1031,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "GET")) return;
 
             try {
                 String query = exchange.getRequestURI().getQuery();
@@ -1049,6 +1074,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "GET")) return;
 
             try {
                 Map<String, Object> stats = paymentService.getDashboardStats(getAuthenticatedLandlordId(exchange));
@@ -1073,11 +1099,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
-
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendJsonResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
-                return;
-            }
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -1129,11 +1151,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
-
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendJsonResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
-                return;
-            }
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -1173,11 +1191,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
-
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendJsonResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
-                return;
-            }
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -1219,6 +1233,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "GET")) return;
 
             try {
                 String query = exchange.getRequestURI().getQuery();
@@ -1263,6 +1278,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "GET")) return;
 
             try {
                 int landlordId = getAuthenticatedLandlordId(exchange);
@@ -1288,11 +1304,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
-
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendJsonResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
-                return;
-            }
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -1343,11 +1355,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
-
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendJsonResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
-                return;
-            }
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -1408,11 +1416,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
-
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                sendJsonResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
-                return;
-            }
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -1447,6 +1451,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "POST")) return;
 
             try {
                 String body = readRequestBody(exchange);
@@ -1495,6 +1500,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
+            if (!requireMethod(exchange, "GET")) return;
 
             try {
                 int landlordId = getAuthenticatedLandlordId(exchange);
@@ -1595,6 +1601,7 @@ public class RentProofServer {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             addCorsHeaders(exchange);
+            if (!requireMethod(exchange, "GET")) return;
             String path = exchange.getRequestURI().getPath();
             if (path == null || path.equals("/") || path.isEmpty()) {
                 path = "/index.html";
@@ -1602,6 +1609,12 @@ public class RentProofServer {
 
             // Clean leading slashes
             String relativePath = path.startsWith("/") ? path.substring(1) : path;
+            try {
+                relativePath = Paths.get(relativePath).normalize().toString()
+                        .replace(File.separatorChar, '/');
+            } catch (InvalidPathException e) {
+                relativePath = "";
+            }
             if (isProtectedFrontendPage(relativePath) && getAuthenticatedLandlordId(exchange) == null) {
                 exchange.getResponseHeaders().set("Location", "/frontend/auth/login.html");
                 exchange.getResponseHeaders().set("Cache-Control", "no-store");
@@ -1611,7 +1624,7 @@ public class RentProofServer {
             File file = resolveWorkspaceFile(relativePath);
 
             if (file == null || !file.exists() || file.isDirectory()) {
-                String notFound = "<h1>404 Not Found</h1><p>Resource not found: " + escapeJson(path) + "</p>";
+                String notFound = "<h1>404 Not Found</h1>";
                 byte[] bytes = notFound.getBytes(StandardCharsets.UTF_8);
                 exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
                 exchange.sendResponseHeaders(404, bytes.length);
@@ -1636,17 +1649,36 @@ public class RentProofServer {
         }
 
         private File resolveWorkspaceFile(String relativePath) {
-            File f = new File(relativePath);
-            if (f.exists()) return f;
+            try {
+                Path root = findWorkspaceRoot();
+                Path candidate = root.resolve(relativePath).normalize();
+                if (!candidate.startsWith(root)) return null;
+                Path frontendRoot = root.resolve("frontend").normalize();
+                Path publicEntryPoint = root.resolve("index.html").normalize();
+                if (!candidate.startsWith(frontendRoot) && !candidate.equals(publicEntryPoint)) return null;
 
-            // Try relative to parent if process started inside bin/ or backend/
-            f = new File("..", relativePath);
-            if (f.exists()) return f;
+                Path realFile = candidate.toRealPath();
+                Path realFrontendRoot = frontendRoot.toRealPath();
+                boolean frontendAsset = realFile.startsWith(realFrontendRoot);
+                boolean publicDocument = candidate.equals(publicEntryPoint)
+                        && realFile.equals(publicEntryPoint.toRealPath());
+                if (!realFile.startsWith(root) || (!frontendAsset && !publicDocument)
+                        || !Files.isRegularFile(realFile)) return null;
+                return realFile.toFile();
+            } catch (IOException | InvalidPathException e) {
+                return null;
+            }
+        }
 
-            f = new File("../..", relativePath);
-            if (f.exists()) return f;
-
-            return null;
+        private Path findWorkspaceRoot() throws IOException {
+            Path current = Paths.get("").toAbsolutePath().normalize();
+            for (int depth = 0; current != null && depth <= 5; depth++) {
+                Path entryPoint = current.resolve(Paths.get(
+                        "backend", "src", "main", "java", "com", "rentproof", "RentProofServer.java"));
+                if (Files.isRegularFile(entryPoint)) return current.toRealPath();
+                current = current.getParent();
+            }
+            return Paths.get("").toRealPath();
         }
 
         private String getMimeType(String fileName) {
@@ -1672,8 +1704,10 @@ public class RentProofServer {
     private static final class LoginAttempt {
         private int failures;
         private long lockedUntilMs;
+        private long lastActivityMs = System.currentTimeMillis();
 
-        private boolean isLocked() {
+        private synchronized boolean isLocked() {
+            lastActivityMs = System.currentTimeMillis();
             if (lockedUntilMs == 0) return false;
             if (System.currentTimeMillis() >= lockedUntilMs) {
                 lockedUntilMs = 0;
@@ -1683,12 +1717,26 @@ public class RentProofServer {
             return true;
         }
 
-        private void recordFailure() {
+        private synchronized void recordFailure() {
+            lastActivityMs = System.currentTimeMillis();
             failures++;
             if (failures >= 5) {
                 lockedUntilMs = System.currentTimeMillis() + (5 * 60 * 1000L);
             }
         }
+
+        private synchronized boolean isExpired(long now) {
+            return now - lastActivityMs > 10 * 60 * 1000L;
+        }
+    }
+
+    private static void purgeExpiredLoginAttempts() {
+        long now = System.currentTimeMillis();
+        LOGIN_ATTEMPTS.forEach((email, attempt) -> {
+            if (attempt.isExpired(now)) {
+                LOGIN_ATTEMPTS.remove(email, attempt);
+            }
+        });
     }
 
     private static String readRequestBody(HttpExchange exchange) throws IOException {
@@ -1811,7 +1859,14 @@ public class RentProofServer {
     }
 
     private static Integer getAuthenticatedLandlordId(HttpExchange exchange) {
-        return SessionManager.getLandlordId(getSessionToken(exchange));
+        String token = getSessionToken(exchange);
+        Integer landlordId = SessionManager.getLandlordId(token);
+        if (landlordId != null) {
+            exchange.getResponseHeaders().set("Set-Cookie",
+                    "rentproof_session=" + token + "; Path=/; HttpOnly; SameSite=Strict; Max-Age=1800"
+                            + secureCookieAttribute());
+        }
+        return landlordId;
     }
 
     private static boolean requireAuthentication(HttpExchange exchange) throws IOException {
@@ -1840,7 +1895,7 @@ public class RentProofServer {
                 return rs.next();
             }
         } catch (SQLException e) {
-            return false;
+            throw new IllegalStateException("Could not verify room ownership.", e);
         }
     }
 
@@ -1893,7 +1948,7 @@ public class RentProofServer {
                 return rs.next();
             }
         } catch (SQLException e) {
-            return false;
+            throw new IllegalStateException("Could not verify resource ownership.", e);
         }
     }
 
@@ -1905,8 +1960,21 @@ public class RentProofServer {
         return false;
     }
 
+    private static boolean requireMethod(HttpExchange exchange, String... allowedMethods) throws IOException {
+        String method = exchange.getRequestMethod();
+        for (String allowedMethod : allowedMethods) {
+            if (allowedMethod.equalsIgnoreCase(method)) {
+                return true;
+            }
+        }
+
+        exchange.getResponseHeaders().set("Allow", String.join(", ", allowedMethods));
+        sendJsonResponse(exchange, 405, "{\"success\":false,\"error\":\"Method Not Allowed\"}");
+        return false;
+    }
+
     private static boolean isProtectedFrontendPage(String path) {
-        String normalized = path.replace('\\', '/');
+        String normalized = path.replace('\\', '/').toLowerCase(java.util.Locale.ROOT);
         if (!normalized.endsWith(".html")) return false;
         return normalized.startsWith("frontend/dashboard/")
                 || normalized.startsWith("frontend/properties/")
