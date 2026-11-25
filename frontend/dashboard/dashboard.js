@@ -13,12 +13,12 @@
  * - Full responsive sidebar state persistence
  */
 
-// Offline fallback seed records (strictly matching database/rentproof.sql for Landlord 1: Aditi Sharma)
+// Offline fallback records are presentation-only; the server session remains authoritative.
 const FALLBACK_SEED = {
   landlord: {
     landlordId: 1,
-    fullName: "Aditi Sharma",
-    email: "aditi.landlord@rentproof.com"
+    fullName: "Landlord",
+    email: ""
   },
   properties: [
     {
@@ -109,7 +109,8 @@ const FALLBACK_SEED = {
   ]
 };
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  if (!(await window.RentProofSecurity.requireSession())) return;
   setupNavigationAndSidebar();
   setupActiveUser();
   displayLiveDate();
@@ -141,16 +142,6 @@ function setupNavigationAndSidebar() {
     }
   });
 
-  // Logout Handler
-  const logoutBtn = document.getElementById("logoutBtn");
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", () => {
-      if (confirm("Are you sure you want to sign out of RentProof?")) {
-        localStorage.removeItem("rentproof_user");
-        window.location.href = "../auth/login.html";
-      }
-    });
-  }
 }
 
 /**
@@ -158,8 +149,8 @@ function setupNavigationAndSidebar() {
  */
 function setupActiveUser() {
   const user = JSON.parse(localStorage.getItem("rentproof_user")) || {
-    fullName: "Aditi Sharma",
-    email: "aditi.landlord@rentproof.com"
+    fullName: "Landlord",
+    email: ""
   };
 
   const nameEl = document.getElementById("welcomeLandlordName");
@@ -200,7 +191,8 @@ async function loadDashboardData() {
   const landlordId = user.landlordId || 1;
 
   try {
-    const response = await fetch(`/api/dashboard/summary?landlordId=${landlordId}`, {
+    const response = await fetch("/api/dashboard/summary", {
+        credentials: "same-origin",
       headers: { "Accept": "application/json" }
     });
 

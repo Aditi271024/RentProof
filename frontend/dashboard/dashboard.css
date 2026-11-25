@@ -65,6 +65,7 @@
 }
 
 .welcome-text h1 {
+  font-family: var(--font-heading);
   font-size: 1.75rem;
   font-weight: 700;
   margin: 0 0 6px 0;
@@ -77,6 +78,7 @@
 }
 
 .welcome-text p {
+  font-family: var(--font-sans);
   margin: 0;
   font-size: 0.95rem;
   color: #D1D9E0;
@@ -90,6 +92,7 @@
 }
 
 .date-badge {
+  font-family: var(--font-sans);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -176,6 +179,7 @@
 .stat-card.info .stat-icon { background-color: var(--info-bg); color: var(--info); }
 
 .stat-value {
+  font-family: var(--font-sans);
   font-size: 1.65rem;
   font-weight: 700;
   color: var(--navy);
@@ -184,6 +188,7 @@
 }
 
 .stat-label {
+  font-family: var(--font-sans);
   font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -209,6 +214,7 @@
 }
 
 .quick-actions-title {
+  font-family: var(--font-heading);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -227,6 +233,7 @@
 }
 
 .btn-action {
+  font-family: var(--font-sans);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -299,6 +306,7 @@
 }
 
 .card-header h3 {
+  font-family: var(--font-heading);
   margin: 0;
   font-size: 1.05rem;
   font-weight: 700;
@@ -309,6 +317,7 @@
 }
 
 .card-header-link {
+  font-family: var(--font-sans);
   font-size: 0.84rem;
   font-weight: 600;
   color: var(--steel-blue);
@@ -330,6 +339,7 @@
    DATA TABLES (Modern, Clean)
    ========================================== */
 .dashboard-table {
+  font-family: var(--font-sans);
   width: 100%;
   border-collapse: collapse;
   font-size: 0.9rem;
