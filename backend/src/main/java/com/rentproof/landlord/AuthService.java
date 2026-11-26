@@ -1,9 +1,15 @@
 package com.rentproof.landlord;
 
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
 import java.sql.SQLException;
+import java.util.Base64;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
@@ -11,7 +17,7 @@ import java.util.regex.Pattern;
  * 
  * Responsibilities:
  * - Registration validation (email format, 10-digit phone, password length & confirmation)
- * - Cryptographic password hashing (SHA-256)
+ * - Salted PBKDF2 password hashing (HMAC-SHA-256)
  * - User login verification against database
  * - Protection against plaintext password storage
  * 
@@ -24,8 +30,20 @@ import java.util.regex.Pattern;
  * - Static helper methods
  */
 public class AuthService {
+    public static final String PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256";
+    public static final int PBKDF2_ITERATIONS = 120000;
+    public static final int HASH_BYTES = 32;
+    public static final int SALT_BYTES = 16;
 
     private final LandlordDAO landlordDAO;
+    private static final String DUPLICATE_ACCOUNT_MESSAGE =
+            "An account with this email already exists. Please login instead.";
+
+    public static final class DuplicateAccountException extends IllegalArgumentException {
+        public DuplicateAccountException() {
+            super(DUPLICATE_ACCOUNT_MESSAGE);
+        }
+    }
 
     // Email regex pattern conforming to standard email specifications
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
@@ -82,7 +100,7 @@ public class AuthService {
         // Check if email already exists in database
         Landlord existing = landlordDAO.getLandlordByEmail(email);
         if (existing != null) {
-            return "An account with email '" + email + "' already exists. Please login instead.";
+            return DUPLICATE_ACCOUNT_MESSAGE;
         }
 
         return null; // Valid
@@ -109,7 +127,7 @@ public class AuthService {
     }
 
     /**
-     * Registers a new Landlord account with encrypted password storage.
+     * Registers a new landlord account with salted password-hash storage.
      * 
      * @return registered Landlord object with generated ID
      * @throws IllegalArgumentException if input validation fails
@@ -120,25 +138,30 @@ public class AuthService {
         // Step 1: Validate inputs
         String validationError = validateRegistration(fullName, email, phone, plainPassword, confirmPassword);
         if (validationError != null) {
+            if (DUPLICATE_ACCOUNT_MESSAGE.equals(validationError)) {
+                throw new DuplicateAccountException();
+            }
             throw new IllegalArgumentException(validationError);
         }
 
-        // Step 2: Hash the password securely using SHA-256
-        String passwordHash = hashPassword(plainPassword);
+        // Step 2: Generate an independent salt and derive a PBKDF2 hash
+        String salt = generateSalt();
+        String passwordHash = hashPassword(plainPassword, salt, PBKDF2_ITERATIONS);
 
         // Step 3: Instantiate Landlord model
         Landlord newLandlord = new Landlord(
                 fullName.trim(),
-                email.toLowerCase().trim(),
+                email.trim().toLowerCase(Locale.ROOT),
                 phone.trim(),
                 passwordHash
         );
+        newLandlord.setPasswordSalt(salt);
+        newLandlord.setPasswordIterations(PBKDF2_ITERATIONS);
 
         // Step 4: Persist through DAO
         int generatedId = landlordDAO.registerLandlord(newLandlord);
         if (generatedId > 0) {
             newLandlord.setLandlordId(generatedId);
-            System.out.println("[AuthService] Registered new landlord successfully with ID: " + generatedId);
             return newLandlord;
         } else {
             throw new SQLException("Failed to save landlord record to database.");
@@ -155,61 +178,102 @@ public class AuthService {
     public Landlord login(String email, String plainPassword) {
         String validationError = validateLogin(email, plainPassword);
         if (validationError != null) {
-            System.err.println("[AuthService] Login validation failed: " + validationError);
             return null;
         }
 
         Landlord landlord = landlordDAO.getLandlordByEmail(email);
         if (landlord == null) {
-            System.err.println("[AuthService] Login failed: No account registered for " + email);
             return null;
         }
 
-        // Hash the incoming password attempt and compare with stored hash
-        String inputHash = hashPassword(plainPassword);
-        if (inputHash.equals(landlord.getPasswordHash())) {
-            System.out.println("[AuthService] Landlord authenticated successfully: " + landlord.getFullName());
+        boolean matches;
+        if (landlord.getPasswordSalt() == null || landlord.getPasswordSalt().trim().isEmpty()) {
+            matches = MessageDigest.isEqual(
+                    hashLegacySha256(plainPassword).getBytes(StandardCharsets.US_ASCII),
+                    landlord.getPasswordHash().getBytes(StandardCharsets.US_ASCII));
+            if (matches) {
+                String salt = generateSalt();
+                String hash = hashPassword(plainPassword, salt, PBKDF2_ITERATIONS);
+                landlordDAO.updatePasswordHash(landlord.getLandlordId(), hash, salt, PBKDF2_ITERATIONS);
+            }
+        } else {
+            String inputHash = hashPassword(plainPassword, landlord.getPasswordSalt(),
+                    landlord.getPasswordIterations() > 0
+                            ? landlord.getPasswordIterations()
+                            : PBKDF2_ITERATIONS);
+            matches = constantTimeHexEquals(inputHash, landlord.getPasswordHash());
+        }
+
+        if (matches) {
             return landlord;
         } else {
-            System.err.println("[AuthService] Login failed: Incorrect password for " + email);
             return null;
         }
     }
 
+    public static String generateSalt() {
+        byte[] salt = new byte[SALT_BYTES];
+        new SecureRandom().nextBytes(salt);
+        return Base64.getEncoder().encodeToString(salt);
+    }
+
     /**
-     * Hashes a plaintext password using standard SHA-256 cryptographic digest.
-     * Built using Core Java standard library (java.security.MessageDigest) - No third-party jars.
-     * 
-     * Viva Explanation:
-     * 1. MessageDigest.getInstance("SHA-256") obtains the algorithm implementation.
-     * 2. password.getBytes(StandardCharsets.UTF_8) converts the password string into a byte array.
-     * 3. digest() produces a 256-bit (32-byte) hash.
-     * 4. Each byte is converted into a 2-digit hexadecimal representation, creating a fixed 64-character hash string.
-     * 
-     * @param plainPassword plaintext string
-     * @return 64-character hexadecimal SHA-256 hash string
+     * Backward-compatible helper used by verification tools.
+     * New registrations and logins use the salted overload below.
      */
     public static String hashPassword(String plainPassword) {
+        String salt = generateSalt();
+        return hashPassword(plainPassword, salt, PBKDF2_ITERATIONS);
+    }
+
+    public static String hashPassword(String plainPassword, String saltBase64, int iterations) {
+        if (plainPassword == null || saltBase64 == null) {
+            throw new IllegalArgumentException("Password and salt are required.");
+        }
+        try {
+            byte[] salt = Base64.getDecoder().decode(saltBase64);
+            PBEKeySpec spec = new PBEKeySpec(
+                    plainPassword.toCharArray(),
+                    salt,
+                    iterations,
+                    HASH_BYTES * 8);
+            try {
+                byte[] hash = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM).generateSecret(spec).getEncoded();
+                return Base64.getEncoder().encodeToString(hash);
+            } finally {
+                spec.clearPassword();
+            }
+        } catch (InvalidKeySpecException | IllegalArgumentException e) {
+            throw new RuntimeException("Password hashing failed.", e);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(PBKDF2_ALGORITHM + " is unavailable.", e);
+        }
+    }
+
+    public static String hashLegacySha256(String plainPassword) {
         if (plainPassword == null) {
             return null;
         }
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hashBytes = md.digest(plainPassword.getBytes(StandardCharsets.UTF_8));
-
-            // Convert byte array to hexadecimal string
-            StringBuilder hexString = new StringBuilder();
-            for (int i = 0; i < hashBytes.length; i++) {
-                byte b = hashBytes[i];
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) {
-                    hexString.append('0'); // Ensure 2 characters per byte
-                }
-                hexString.append(hex);
+            byte[] hashBytes = MessageDigest.getInstance("SHA-256")
+                    .digest(plainPassword.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte value : hashBytes) {
+                hex.append(String.format("%02x", value));
             }
-            return hexString.toString();
+            return hex.toString();
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm is not supported by current JVM runtime.", e);
+            throw new RuntimeException("SHA-256 is unavailable.", e);
         }
+    }
+
+    public static boolean constantTimeHexEquals(String left, String right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        byte[] leftBytes = left.getBytes(StandardCharsets.US_ASCII);
+        byte[] rightBytes = right.getBytes(StandardCharsets.US_ASCII);
+        return leftBytes.length == rightBytes.length
+                && MessageDigest.isEqual(leftBytes, rightBytes);
     }
 }

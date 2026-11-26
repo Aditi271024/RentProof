@@ -3,7 +3,8 @@ package com.rentproof.property;
 import java.sql.Timestamp;
 
 /**
- * Property entity model representing a rental building/unit owned by a landlord.
+ * Property entity model representing a rental building/unit owned by a
+ * landlord.
  * 
  * Concepts used (Syllabus up to Lecture 42):
  * - Classes and Objects
@@ -33,9 +34,9 @@ public class Property implements Comparable<Property> {
     }
 
     // Parameterized Constructor without propertyId (used before DB persistence)
-    public Property(int landlordId, String propertyName, String propertyType, String address, 
-                    String city, String state, String pincode, int totalRooms, 
-                    double monthlyRent, String description) {
+    public Property(int landlordId, String propertyName, String propertyType, String address,
+            String city, String state, String pincode, int totalRooms,
+            double monthlyRent, String description) {
         this.landlordId = landlordId;
         this.propertyName = propertyName;
         this.propertyType = propertyType;
@@ -49,9 +50,9 @@ public class Property implements Comparable<Property> {
     }
 
     // Full Parameterized Constructor (used for mapping existing database records)
-    public Property(int propertyId, int landlordId, String propertyName, String propertyType, 
-                    String address, String city, String state, String pincode, 
-                    int totalRooms, double monthlyRent, String description, Timestamp createdAt) {
+    public Property(int propertyId, int landlordId, String propertyName, String propertyType,
+            String address, String city, String state, String pincode,
+            int totalRooms, double monthlyRent, String description, Timestamp createdAt) {
         this.propertyId = propertyId;
         this.landlordId = landlordId;
         this.propertyName = propertyName;
@@ -165,7 +166,8 @@ public class Property implements Comparable<Property> {
     }
 
     /**
-     * Comparable implementation: natural ordering by property name (case-insensitive).
+     * Comparable implementation: natural ordering by property name
+     * (case-insensitive).
      * Fulfills Java syllabus requirement for Comparable interface.
      */
     @Override

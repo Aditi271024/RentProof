@@ -92,7 +92,7 @@ const SEED_TENANTS = [
     phone: "9988776655",
     emergencyContact: "9811223344",
     permanentAddress: "H-42, Civil Lines, Kanpur, UP",
-    idProofNumber: "AADHAAR-8921-3412-9012",
+    idProofNumber: "",
     moveInDate: "2026-08-01",
     monthlyRent: 8500,
     securityDeposit: 17000,
@@ -110,7 +110,7 @@ const SEED_TENANTS = [
     phone: "9871122334",
     emergencyContact: "9911002233",
     permanentAddress: "12/B Park Street, Lucknow, UP",
-    idProofNumber: "AADHAAR-6712-4590-1123",
+    idProofNumber: "",
     moveInDate: "2026-09-15",
     monthlyRent: 8500,
     securityDeposit: 17000,
@@ -128,7 +128,7 @@ const SEED_TENANTS = [
     phone: "9711334455",
     emergencyContact: "9811556677",
     permanentAddress: "Flat 401, Silver Sands, Chandigarh",
-    idProofNumber: "PAN-ABCDE1234F",
+    idProofNumber: "",
     moveInDate: "2026-07-01",
     monthlyRent: 11000,
     securityDeposit: 22000,
@@ -156,70 +156,70 @@ const SEED_TENANTS = [
 ];
 
 // ==========================================
-// 2. DATA STORAGE REPOSITORY (Demonstration & Offline Mode)
+// 2. DATA STORAGE REPOSITORY (Live MySQL Synchronized)
 // ==========================================
 
-function getStoredTenants() {
-  const data = localStorage.getItem("rentproof_tenants");
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      console.error("[TenantStorage] JSON parse error:", e);
-    }
+let cachedTenants = [];
+let cachedProperties = [];
+let cachedRooms = [];
+
+async function syncBackendData() {
+  const [tenantsRes, propsRes, roomsRes] = await Promise.all([
+    fetch("/api/tenants"),
+    fetch("/api/properties"),
+    fetch("/api/rooms")
+  ]);
+  if (!tenantsRes.ok || !propsRes.ok || !roomsRes.ok) {
+    throw new Error("Could not load tenant, property, and room data from the backend.");
   }
-  // If empty, initialize seed
-  saveStoredTenants(SEED_TENANTS);
-  return [...SEED_TENANTS];
+  const [tenants, properties, rooms] = await Promise.all([
+    tenantsRes.json(),
+    propsRes.json(),
+    roomsRes.json()
+  ]);
+  if (!Array.isArray(tenants) || !Array.isArray(properties) || !Array.isArray(rooms)) {
+    throw new Error("The backend returned invalid tenant, property, or room data.");
+  }
+  cachedTenants = tenants;
+  cachedProperties = properties;
+  cachedRooms = rooms;
+}
+
+function getStoredTenants() {
+  return cachedTenants;
 }
 
 function saveStoredTenants(tenants) {
-  localStorage.setItem("rentproof_tenants", JSON.stringify(tenants));
+  cachedTenants = tenants;
 }
 
 function getStoredProperties() {
-  const data = localStorage.getItem("rentproof_properties");
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      console.error("[PropertyStorage] JSON parse error:", e);
-    }
-  }
-  return [...SEED_PROPERTIES];
+  return cachedProperties;
 }
 
 function getStoredRooms() {
-  const data = localStorage.getItem("rentproof_rooms");
-  if (data) {
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      console.error("[RoomStorage] JSON parse error:", e);
-    }
-  }
-  saveStoredRooms(SEED_ROOMS);
-  return [...SEED_ROOMS];
+  return cachedRooms;
 }
 
 function saveStoredRooms(rooms) {
-  localStorage.setItem("rentproof_rooms", JSON.stringify(rooms));
+  cachedRooms = rooms;
 }
 
 // ==========================================
 // 3. ISOLATED TENANT API LAYER
-// Ready to hook into Java HTTP/Servlet backend
+// Connected to Core Java RentProofServer
 // ==========================================
 const TenantAPI = {
-  // Flag indicating if live backend endpoint is active
-  useLiveBackend: false,
+  // Live MySQL backend enabled
+  useLiveBackend: true,
   apiBaseUrl: "/api/tenants",
 
   async getAllTenants() {
     if (this.useLiveBackend) {
       const res = await fetch(this.apiBaseUrl);
       if (!res.ok) throw new Error("Failed to fetch tenants from Java backend.");
-      return await res.json();
+      cachedTenants = await res.json();
+      return cachedTenants;
     }
     return getStoredTenants();
   },
@@ -241,8 +241,13 @@ const TenantAPI = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(tenantData)
       });
-      if (!res.ok) throw new Error("Backend tenant creation failed.");
-      return await res.json();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Backend tenant creation failed.");
+      }
+      const data = await res.json();
+      await syncBackendData();
+      return data.tenant || data;
     }
 
     // LocalStorage Demonstration Mode
@@ -270,7 +275,7 @@ const TenantAPI = {
       phone: tenantData.phone.trim(),
       emergencyContact: tenantData.emergencyContact ? tenantData.emergencyContact.trim() : "",
       permanentAddress: tenantData.permanentAddress ? tenantData.permanentAddress.trim() : "",
-      idProofNumber: tenantData.permanentAddress ? tenantData.permanentAddress.trim() : "ID-NOT-PROVIDED",
+      idProofNumber: tenantData.idProofNumber ? tenantData.idProofNumber.trim() : "",
       moveInDate: tenantData.moveInDate,
       monthlyRent: Number(tenantData.monthlyRent),
       securityDeposit: Number(tenantData.securityDeposit || 0),
@@ -297,8 +302,13 @@ const TenantAPI = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updateData)
       });
-      if (!res.ok) throw new Error("Backend tenant update failed.");
-      return await res.json();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Backend tenant update failed.");
+      }
+      const data = await res.json();
+      await syncBackendData();
+      return data.tenant || data;
     }
 
     const tenants = getStoredTenants();
@@ -343,7 +353,11 @@ const TenantAPI = {
   async deleteTenant(id) {
     if (this.useLiveBackend) {
       const res = await fetch(`${this.apiBaseUrl}/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Backend tenant deletion failed.");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Backend tenant deletion failed.");
+      }
+      await syncBackendData();
       return true;
     }
 
@@ -371,8 +385,13 @@ const TenantAPI = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ tenantId, propertyId, roomId, monthlyRent, moveInDate })
       });
-      if (!res.ok) throw new Error("Property assignment failed in backend.");
-      return await res.json();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Property assignment failed in backend.");
+      }
+      const data = await res.json();
+      await syncBackendData();
+      return data.tenant || data;
     }
 
     const tenants = getStoredTenants();
@@ -416,9 +435,33 @@ const TenantAPI = {
 // ==========================================
 // 4. MAIN PAGE ROUTER & INITIALIZATION
 // ==========================================
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  if (!(await window.RentProofSecurity.requireSession())) return;
   setupNavigationAndSidebar();
   setupActiveUser();
+  document.addEventListener("click", handleTenantActionClick);
+
+  const globalSearch = document.getElementById("globalTenantSearch");
+  const tenantSearch = document.getElementById("tenantSearchInput");
+  if (globalSearch && tenantSearch) {
+    globalSearch.addEventListener("input", () => {
+      tenantSearch.value = globalSearch.value;
+      renderTenantDashboard();
+    });
+  }
+  const emptyReset = document.getElementById("emptyResetFiltersBtn");
+  const resetFilters = document.getElementById("resetFiltersBtn");
+  if (emptyReset && resetFilters) emptyReset.addEventListener("click", () => resetFilters.click());
+  const notificationButton = document.getElementById("tenantNotificationBtn");
+  if (notificationButton) notificationButton.addEventListener("click", () => showToast("Tenant records are loaded from the backend.", "info"));
+
+  // Load live data from MySQL via Core Java REST endpoints
+  try {
+    await syncBackendData();
+  } catch (error) {
+    console.error("[TenantUI] Could not load tenant data:", error);
+    showToast(error.message || "Could not load tenant records.", "error");
+  }
 
   // Route to the appropriate page controller
   if (document.getElementById("tenantsTableBody")) {
@@ -431,6 +474,19 @@ document.addEventListener("DOMContentLoaded", () => {
     initAssignPropertyForm();
   }
 });
+
+function handleTenantActionClick(event) {
+  const button = event.target.closest("[data-tenant-action]");
+  if (!button) return;
+
+  const tenantId = Number(button.dataset.tenantId);
+  if (button.dataset.tenantAction === "view") {
+    openViewTenantModal(tenantId);
+  } else if (button.dataset.tenantAction === "delete") {
+    const tenant = cachedTenants.find((item) => Number(item.tenantId) === tenantId);
+    openDeleteTenantModal(tenantId, tenant ? tenant.fullName : "this tenant");
+  }
+}
 
 // ==========================================
 // 5. TENANTS DASHBOARD CONTROLLER (tenants.html)
@@ -622,13 +678,13 @@ function renderTenantsTable(tenants) {
       </td>
       <td data-label="Actions">
         <div class="table-actions">
-          <button class="btn-action action-view" title="View Full Details" onclick="openViewTenantModal(${t.tenantId})">
+          <button class="btn-action action-view" title="View Full Details" data-tenant-action="view" data-tenant-id="${t.tenantId}">
             👁️
           </button>
           <a href="edit-tenant.html?id=${t.tenantId}" class="btn-action action-edit" title="Edit Tenant">
             ✏️
           </a>
-          <button class="btn-action action-delete" title="Delete Tenant" onclick="openDeleteTenantModal(${t.tenantId}, '${escapeHtml(t.fullName)}')">
+          <button class="btn-action action-delete" title="Delete Tenant" data-tenant-action="delete" data-tenant-id="${t.tenantId}">
             🗑️
           </button>
         </div>
@@ -961,6 +1017,7 @@ function handleSaveNewTenant(form) {
     email,
     emergencyContact,
     permanentAddress,
+    idProofNumber: "",
     moveInDate,
     propertyId: Number(propertyId),
     roomId: Number(roomId),
@@ -1237,9 +1294,11 @@ function executePropertyAssignment() {
   const { tenantId, propertyId, roomId, monthlyRent, moveInDate } = pendingAssignmentData;
 
   TenantAPI.assignProperty(tenantId, propertyId, roomId, monthlyRent, moveInDate)
-    .then(updatedTenant => {
+    .then(result => {
       closeAllModals();
-      showToast(`Room assigned successfully to ${updatedTenant.fullName}!`, "success");
+      const tenant = getStoredTenants().find(t => t.tenantId === Number(tenantId));
+      const tenantName = (result && result.fullName) || (tenant && tenant.fullName) || "Tenant";
+      showToast(`Room assigned successfully to ${tenantName}!`, "success");
       setTimeout(() => {
         window.location.href = "tenants.html";
       }, 1300);
@@ -1353,15 +1412,6 @@ function setupNavigationAndSidebar() {
     });
   }
 
-  // Logout button
-  const logoutBtn = document.getElementById("logoutBtn");
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", () => {
-      if (confirm("Are you sure you want to sign out of RentProof?")) {
-        window.location.href = "../auth/login.html";
-      }
-    });
-  }
 }
 
 function setupActiveUser() {

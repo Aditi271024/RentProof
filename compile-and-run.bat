@@ -1,19 +1,25 @@
+
 @echo off
 echo ============================================================
-echo   Compiling RentProof Core Java & JDBC Backend
+echo Compiling RentProof Core Java ^& JDBC Backend
 echo ============================================================
 
 if not exist bin mkdir bin
 
-javac -d bin -cp ".;lib/*;backend/src/main/resources" backend/src/main/java/com/rentproof/database/*.java backend/src/main/java/com/rentproof/landlord/*.java backend/src/main/java/com/rentproof/property/*.java backend/src/main/java/com/rentproof/*.java
+if exist sources.txt del sources.txt
+
+for /r backend\src\main\java %%F in (*.java) do echo "%%F" >> sources.txt
+
+javac -d bin -cp ".;lib/*;backend/src/main/resources" @sources.txt
 
 if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] Compilation failed. Please check Java errors above.
+    echo [ERROR] Compilation failed.
     pause
-    exit /b %ERRORLEVEL%
+    exit /b 1
 )
 
-echo [SUCCESS] Backend compiled successfully into /bin folder!
+echo.
+echo [SUCCESS] Backend compiled successfully!
 echo.
 echo Running RentProof Verification Suite...
 echo.

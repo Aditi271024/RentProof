@@ -30,8 +30,9 @@ public class DBConnection {
     // Default configuration values
     private static String driver = "com.mysql.cj.jdbc.Driver";
     private static String url = "jdbc:mysql://localhost:3306/rentproof?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
-    private static String username = "root";
-    private static String password = "root";
+    private static String serverUrl;
+    private static String username;
+    private static String password;
 
     // Static block executed once when the class is loaded into memory
     static {
@@ -80,7 +81,9 @@ public class DBConnection {
             }
 
             if (is != null) {
-                props.load(is);
+                try (InputStream input = is) {
+                    props.load(input);
+                }
                 if (props.getProperty("db.driver") != null) {
                     driver = props.getProperty("db.driver").trim();
                 }
@@ -93,25 +96,26 @@ public class DBConnection {
                 if (props.getProperty("db.password") != null) {
                     password = props.getProperty("db.password").trim();
                 }
+                if (props.getProperty("db.serverUrl") != null) {
+                    serverUrl = props.getProperty("db.serverUrl").trim();
+                }
                 System.out.println("[DBConnection] Loaded database settings from db.properties.");
             } else {
-                System.out.println("[DBConnection] db.properties not found. Using default connection settings.");
+                System.err.println("[DBConnection] db.properties not found. Configure database access before connecting.");
             }
-        } catch (Exception e) {
-            System.err.println("[DBConnection] Warning: Could not read db.properties (" + e.getMessage() + "). Using defaults.");
-        } finally {
-            if (is != null) {
-                try {
-                    is.close();
-                } catch (Exception ignored) {
-                }
-            }
+        } catch (java.io.IOException e) {
+            System.err.println("[DBConnection] Could not read db.properties: " + e.getMessage());
         }
 
         // Allow system environment variable overrides (common in enterprise setups)
         String envUrl = System.getenv("RENTPROOF_DB_URL");
         if (envUrl != null && !envUrl.isEmpty()) {
             url = envUrl;
+        }
+
+        String envServerUrl = System.getenv("RENTPROOF_DB_SERVER_URL");
+        if (envServerUrl != null && !envServerUrl.isEmpty()) {
+            serverUrl = envServerUrl;
         }
 
         String envUser = System.getenv("RENTPROOF_DB_USER");
@@ -133,13 +137,63 @@ public class DBConnection {
      * @throws SQLException if a database access error occurs
      */
     public static Connection getConnection() throws SQLException {
+        validateCredentials();
         try {
             return DriverManager.getConnection(url, username, password);
         } catch (SQLException e) {
-            System.err.println("[DBConnection] Connection failed to: " + url + " as user: " + username);
             System.err.println("[DBConnection] Error code: " + e.getErrorCode() + " | SQLState: " + e.getSQLState());
             throw e;
         }
+    }
+
+    /**
+     * Opens a connection to the MySQL server without selecting a database.
+     * The optional db.serverUrl property can be used when the server URL cannot
+     * be derived from db.url.
+     *
+     * @return active connection to the MySQL server
+     * @throws SQLException if the server connection fails or credentials are missing
+     */
+    public static Connection getServerConnection() throws SQLException {
+        validateCredentials();
+        String connectionUrl = serverUrl;
+        if (connectionUrl == null || connectionUrl.isEmpty()) {
+            connectionUrl = getServerUrl(url);
+        }
+
+        try {
+            return DriverManager.getConnection(connectionUrl, username, password);
+        } catch (SQLException e) {
+            System.err.println("[DBConnection] Server connection failed. Error code: "
+                    + e.getErrorCode() + " | SQLState: " + e.getSQLState());
+            throw e;
+        }
+    }
+
+    private static void validateCredentials() throws SQLException {
+        if (username == null || username.trim().isEmpty()) {
+            throw new SQLException("Database user is missing. Set db.user in db.properties.");
+        }
+        if (password == null) {
+            throw new SQLException("Database password is missing. Set db.password in db.properties.");
+        }
+    }
+
+    private static String getServerUrl(String databaseUrl) throws SQLException {
+        int protocolEnd = databaseUrl.indexOf("://");
+        if (protocolEnd < 0) {
+            throw new SQLException("Invalid MySQL URL. Set db.serverUrl in db.properties.");
+        }
+
+        int authorityStart = protocolEnd + 3;
+        int pathStart = databaseUrl.indexOf('/', authorityStart);
+        int queryStart = databaseUrl.indexOf('?', authorityStart);
+        if (pathStart < 0 || (queryStart >= 0 && queryStart < pathStart)) {
+            return databaseUrl;
+        }
+
+        String query = queryStart >= 0 ? databaseUrl.substring(queryStart) : "";
+        return databaseUrl.substring(0, pathStart) + query;
     }
 
     /**

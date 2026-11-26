@@ -247,17 +247,18 @@ For examination and viva questions, this schema follows third normal form (3NF):
 
 ---
 
-## 6. How to Execute in MySQL Workbench
+## 6. Safe Database Initialization
 
-Follow these steps to set up the database:
+`database/rentproof.sql` is non-destructive: it creates missing tables and does not drop tables or delete records. It does not insert sample data. Use `DatabaseInitializer` as the canonical setup because it also applies additive migrations for known legacy columns (landlord password metadata and tenant rent/address fields) without replacing existing rows. It does not attempt to repair arbitrary schema drift.
 
-1. Open **MySQL Workbench**.
-2. Connect to your local MySQL instance (usually `localhost:3306`, user: `root`).
-3. Click on **File** -> **Open SQL Script...** (or press `Ctrl + Shift + O`).
-4. Select the file: `database/rentproof.sql`.
-5. Click the **Execute (Lightning icon)** button or press `Ctrl + Shift + Enter`.
-6. Look at the **Action Output** pane at the bottom: verify that all `CREATE TABLE` and `INSERT` commands show green checkmarks.
-7. In the left **Navigator** pane, right-click the **Schemas** list and click **Refresh All**. The `rentproof` database will appear with all tables and sample seed records.
+From the project root on Windows, compile and run the initializer:
+
+```bat
+javac -d bin -cp "lib/*;backend\\src\\main\\resources" backend\\src\\main\\java\\com\\rentproof\\database\\DBConnection.java backend\\src\\main\\java\\com\\rentproof\\database\\DatabaseInitializer.java
+java -cp "bin;lib/*;backend\\src\\main\\resources" com.rentproof.database.DatabaseInitializer
+```
+
+Provide database settings in the ignored `backend/src/main/resources/db.properties`. The initializer uses the credentials there to connect to the MySQL server; it derives a server-level URL from `db.url`, or can use an optional `db.serverUrl` when needed. Keep this file and database backups out of source control. The separate `database/rentproof-sample-data.sql` contains fixed-ID fixtures and should only be used with a verified disposable database.
 
 ---
 

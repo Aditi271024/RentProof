@@ -106,7 +106,7 @@ public class PaymentDemo {
     private static void runLiveDatabaseTests(PaymentService paymentService) {
         try {
             System.out.println("\n--- 4. RETRIEVING LIVE PAYMENTS & DASHBOARD STATS ---");
-            Map<String, Object> stats = paymentService.getDashboardStats();
+            Map<String, Object> stats = paymentService.getDashboardStats(1);
             System.out.println("Total Rent Collected    : Rs. " + stats.get("totalRentCollected"));
             System.out.println("Successful Payments     : " + stats.get("successfulPaymentCount"));
             System.out.println("Pending Payments        : " + stats.get("pendingPaymentCount"));

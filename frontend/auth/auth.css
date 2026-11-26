@@ -71,6 +71,7 @@
 }
 
 .auth-brand-title {
+  font-family: var(--font-sans);
   font-size: 1.5rem;
   font-weight: 700;
   color: var(--white);
@@ -86,6 +87,7 @@
 }
 
 .auth-hero-heading {
+  font-family: var(--font-heading);
   font-size: 2rem;
   line-height: 1.2;
   color: var(--white);
@@ -94,6 +96,7 @@
 }
 
 .auth-hero-tagline {
+  font-family: var(--font-sans);
   color: #D1D9E0;
   font-size: 1rem;
   line-height: 1.6;
@@ -148,6 +151,7 @@
 }
 
 .auth-form-header h2 {
+  font-family: var(--font-heading);
   font-size: 1.65rem;
   color: var(--navy);
   margin-bottom: 6px;

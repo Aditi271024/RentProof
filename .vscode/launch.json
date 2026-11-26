@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "RentProofServer",
+            "request": "launch",
+            "mainClass": "com.rentproof.RentProofServer",
+            "classPaths": [
+                "${workspaceFolder}/bin",
+                "${workspaceFolder}/lib/mysql-connector-j-8.3.0.jar"
+            ],
+            "cwd": "${workspaceFolder}",
+            "vmArgs": "",
+            "env": {
+                "JAVA_HOME": "/Library/Java/JavaVirtualMachines/jdk-27.jdk/Contents/Home"
+            }
+        }
+    ]
+}
