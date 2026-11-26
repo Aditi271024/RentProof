@@ -59,8 +59,8 @@ public class TenantDAO {
             pstmt.setString(4, tenant.getEmail().trim());
             pstmt.setString(5, tenant.getPhone().trim());
             pstmt.setString(6, tenant.getEmergencyContact() != null ? tenant.getEmergencyContact().trim() : null);
-            pstmt.setString(7, tenant.getPermanentAddress());
-            pstmt.setString(8, tenant.getIdProofNumber());
+            pstmt.setString(7, tenant.getPermanentAddress() != null ? tenant.getPermanentAddress().trim() : null);
+            pstmt.setString(8, tenant.getIdProofNumber() != null ? tenant.getIdProofNumber().trim() : null);
             pstmt.setDate(9, tenant.getMoveInDate());
             pstmt.setDouble(10, tenant.getMonthlyRent());
             pstmt.setDouble(11, tenant.getSecurityDeposit());
@@ -150,13 +150,14 @@ public class TenantDAO {
     public ArrayList<Tenant> getAllTenants() {
         ArrayList<Tenant> list = new ArrayList<>();
         String sql = "SELECT t.tenant_id, t.property_id, t.room_id, t.full_name, t.email, t.phone, " +
-                     "t.emergency_contact, t.permanent_address, t.id_proof_number, t.move_in_date, t.move_out_date, " +
-                     "t.security_deposit, t.tenant_status, t.created_at, " +
-                     "p.property_name, r.room_number, COALESCE(t.monthly_rent, r.monthly_rent) AS monthly_rent " +
-                     "FROM tenants t " +
-                     "LEFT JOIN properties p ON t.property_id = p.property_id " +
-                     "LEFT JOIN rooms r ON t.room_id = r.room_id " +
-                     "ORDER BY t.tenant_id DESC";
+                "t.emergency_contact, t.permanent_address, t.id_proof_number, t.move_in_date, t.move_out_date, " +
+                "t.security_deposit, t.tenant_status, t.created_at, " +
+                "p.property_name, r.room_number, COALESCE(NULLIF(t.monthly_rent, 0), " +
+                "NULLIF(r.monthly_rent, 0), p.monthly_rent) AS monthly_rent " +
+                "FROM tenants t " +
+                "LEFT JOIN properties p ON t.property_id = p.property_id " +
+                "LEFT JOIN rooms r ON t.room_id = r.room_id " +
+                "ORDER BY t.tenant_id DESC";
 
         try (Connection conn = DBConnection.getConnection();
                 PreparedStatement pstmt = conn.prepareStatement(sql);
@@ -179,13 +180,14 @@ public class TenantDAO {
      */
     public Tenant getTenantById(int tenantId) {
         String sql = "SELECT t.tenant_id, t.property_id, t.room_id, t.full_name, t.email, t.phone, " +
-                     "t.emergency_contact, t.permanent_address, t.id_proof_number, t.move_in_date, t.move_out_date, " +
-                     "t.security_deposit, t.tenant_status, t.created_at, " +
-                     "p.property_name, r.room_number, COALESCE(t.monthly_rent, r.monthly_rent) AS monthly_rent " +
-                     "FROM tenants t " +
-                     "LEFT JOIN properties p ON t.property_id = p.property_id " +
-                     "LEFT JOIN rooms r ON t.room_id = r.room_id " +
-                     "WHERE t.tenant_id = ?";
+                "t.emergency_contact, t.permanent_address, t.id_proof_number, t.move_in_date, t.move_out_date, " +
+                "t.security_deposit, t.tenant_status, t.created_at, " +
+                "p.property_name, r.room_number, COALESCE(NULLIF(t.monthly_rent, 0), " +
+                "NULLIF(r.monthly_rent, 0), p.monthly_rent) AS monthly_rent " +
+                "FROM tenants t " +
+                "LEFT JOIN properties p ON t.property_id = p.property_id " +
+                "LEFT JOIN rooms r ON t.room_id = r.room_id " +
+                "WHERE t.tenant_id = ?";
 
         try (Connection conn = DBConnection.getConnection();
                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -235,8 +237,8 @@ public class TenantDAO {
             pstmt.setString(2, tenant.getEmail().trim());
             pstmt.setString(3, tenant.getPhone().trim());
             pstmt.setString(4, tenant.getEmergencyContact() != null ? tenant.getEmergencyContact().trim() : null);
-            pstmt.setString(5, tenant.getPermanentAddress());
-            pstmt.setString(6, tenant.getIdProofNumber());
+            pstmt.setString(5, tenant.getPermanentAddress() != null ? tenant.getPermanentAddress().trim() : null);
+            pstmt.setString(6, tenant.getIdProofNumber() != null ? tenant.getIdProofNumber().trim() : null);
             pstmt.setDouble(7, tenant.getMonthlyRent());
             pstmt.setDouble(8, tenant.getSecurityDeposit());
             pstmt.setString(9, tenant.getTenantStatus());
@@ -505,14 +507,15 @@ public class TenantDAO {
     public ArrayList<Tenant> getTenantsByProperty(int propertyId) {
         ArrayList<Tenant> list = new ArrayList<>();
         String sql = "SELECT t.tenant_id, t.property_id, t.room_id, t.full_name, t.email, t.phone, " +
-                     "t.emergency_contact, t.permanent_address, t.id_proof_number, t.move_in_date, t.move_out_date, " +
-                     "t.security_deposit, t.tenant_status, t.created_at, " +
-                     "p.property_name, r.room_number, COALESCE(t.monthly_rent, r.monthly_rent) AS monthly_rent " +
-                     "FROM tenants t " +
-                     "LEFT JOIN properties p ON t.property_id = p.property_id " +
-                     "LEFT JOIN rooms r ON t.room_id = r.room_id " +
-                     "WHERE t.property_id = ? " +
-                     "ORDER BY t.tenant_id DESC";
+                "t.emergency_contact, t.permanent_address, t.id_proof_number, t.move_in_date, t.move_out_date, " +
+                "t.security_deposit, t.tenant_status, t.created_at, " +
+                "p.property_name, r.room_number, COALESCE(NULLIF(t.monthly_rent, 0), " +
+                "NULLIF(r.monthly_rent, 0), p.monthly_rent) AS monthly_rent " +
+                "FROM tenants t " +
+                "LEFT JOIN properties p ON t.property_id = p.property_id " +
+                "LEFT JOIN rooms r ON t.room_id = r.room_id " +
+                "WHERE t.property_id = ? " +
+                "ORDER BY t.tenant_id DESC";
 
         try (Connection conn = DBConnection.getConnection();
                 PreparedStatement pstmt = conn.prepareStatement(sql)) {
