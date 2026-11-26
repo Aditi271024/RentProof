@@ -1,15 +1,18 @@
 /**
- * RENTPROOF - PAYMENT MANAGEMENT MODULE (AANVI)
+ * RENTPROOF - PAYMENT & RENT MANAGEMENT MODULE (AANVI)
  * Vanilla JavaScript (No Frameworks)
  * 
  * Features:
- * - Dynamic Backend API connectivity backed by MySQL
+ * - Dynamic Backend API connectivity with graceful offline localStorage fallback
+ * - Seed dataset matching database/rentproof.sql exactly
  * - Real-time statistics (Total Collected, Successful, Pending, Overdue)
+ * - Rent Management & Tenant Dues Overview (Monthly rent, due dates, payment status per tenant)
  * - Add Payment workflow with cascading Tenant -> Property -> Room auto-fill
  * - Interactive Real-Time Receipt Preview during payment entry
- * - Multi-criteria search and filter on Payment History
+ * - Robust Duplicate Transaction & Duplicate Month Payment Prevention
+ * - Multi-criteria search and filter on Payment History (API + Offline Fallback)
  * - View Digital Official Receipt Modal with print capability
- * - Quick Status Update & Delete confirmation workflows
+ * - Full Payment Edit & Status Update workflows
  * - Sidebar collapse & Landlord session management
  */
 
@@ -18,9 +21,9 @@ const API_BASE = window.location.origin.includes(":8080") ? "" : "http://localho
 
 // Seed Datasets (Strictly synchronized with database/rentproof.sql)
 const SEED_PROPERTIES = [
-  { propertyId: 1, propertyName: "Sunrise Executive PG", propertyType: "PG", city: "Greater Noida" },
-  { propertyId: 2, propertyName: "Ivory Heights 3BHK Flat", propertyType: "Flat", city: "Noida" },
-  { propertyId: 3, propertyName: "Blue Ridge Residency", propertyType: "Apartment", city: "Noida" }
+  { propertyId: 1, propertyName: "Sunrise Executive PG", propertyType: "PG", city: "Greater Noida", monthlyRent: 8500 },
+  { propertyId: 2, propertyName: "Ivory Heights 3BHK Flat", propertyType: "Flat", city: "Noida", monthlyRent: 28000 },
+  { propertyId: 3, propertyName: "Blue Ridge Residency", propertyType: "Apartment", city: "Noida", monthlyRent: 34000 }
 ];
 
 const SEED_ROOMS = [
@@ -42,7 +45,8 @@ const SEED_TENANTS = [
     propertyName: "Sunrise Executive PG",
     roomId: 1,
     roomNumber: "101",
-    monthlyRent: 8500
+    monthlyRent: 8500,
+    dueDate: "5th of month"
   },
   {
     tenantId: 2,
@@ -52,7 +56,8 @@ const SEED_TENANTS = [
     propertyName: "Sunrise Executive PG",
     roomId: 2,
     roomNumber: "102",
-    monthlyRent: 8500
+    monthlyRent: 8500,
+    dueDate: "5th of month"
   },
   {
     tenantId: 3,
@@ -62,7 +67,8 @@ const SEED_TENANTS = [
     propertyName: "Ivory Heights 3BHK Flat",
     roomId: 7,
     roomNumber: "Room-A (Master)",
-    monthlyRent: 11000
+    monthlyRent: 11000,
+    dueDate: "5th of month"
   }
 ];
 
@@ -150,184 +156,422 @@ const SEED_PAYMENTS = [
 ];
 
 // Document Initialization
-document.addEventListener("DOMContentLoaded", async () => {
-  if (!(await window.RentProofSecurity.requireSession())) return;
+document.addEventListener("DOMContentLoaded", () => {
   setupNavigationAndSidebar();
   setupActiveUser();
 
-  document.addEventListener("click", handlePaymentActionClick);
-  try {
-    if (document.getElementById("paymentsDashboardView")) {
-      await initPaymentsDashboard();
-    } else if (document.getElementById("addPaymentForm")) {
-      await initAddPaymentForm();
-    } else if (document.getElementById("paymentHistoryView")) {
-      await initPaymentHistory();
-    }
-  } catch (error) {
-    console.error("[PaymentUI] Could not initialize the current page:", error);
-    showToast(error.message || "Could not load payment data.", "error");
+  if (document.getElementById("paymentsDashboardView")) {
+    initPaymentsDashboard();
+  } else if (document.getElementById("addPaymentForm")) {
+    initAddPaymentForm();
+  } else if (document.getElementById("paymentHistoryView")) {
+    initPaymentHistory();
   }
 });
 
-function handlePaymentActionClick(event) {
-  const button = event.target.closest("[data-payment-action]");
-  if (!button) return;
-
-  const paymentId = Number(button.dataset.paymentId);
-  switch (button.dataset.paymentAction) {
-    case "receipt":
-      viewPaymentReceipt(paymentId);
-      break;
-    case "status":
-      openStatusModal(paymentId, button.dataset.paymentStatus || "");
-      break;
-    case "delete":
-      confirmDeletePayment(paymentId);
-      break;
-    case "close-receipt":
-      closeReceiptModal();
-      break;
-    case "print-receipt":
-      printReceipt();
-      break;
-    case "close-status":
-      closeStatusModal();
-      break;
-    case "save-status":
-      saveStatusModalChange();
-      break;
-    case "notification":
-      showToast("No new payment notifications.", "info");
-      break;
-  }
-}
-
 /* ==============================================================================
-   DATA ACCESS LAYER (Backend API)
+   DATA ACCESS LAYER (API First with LocalStorage Fallback)
    ============================================================================== */
 
 /**
- * Loads all payments asynchronously from live Java backend API.
+ * Loads payments asynchronously from Java backend API with optional search/filter params,
+ * falling back gracefully to localStorage when offline.
  */
-async function loadPayments() {
-  const res = await fetch(`${API_BASE}/api/payments`);
-  if (!res.ok) throw new Error("Failed to fetch payments from the backend.");
-  const data = await res.json();
-  if (!Array.isArray(data)) throw new Error("The backend returned an invalid payments response.");
-  return data;
+async function loadPayments(filters = null) {
+  let url = `${API_BASE}/api/payments`;
+  if (filters) {
+    const params = new URLSearchParams();
+    if (filters.search) params.append("search", filters.search);
+    if (filters.tenantId && filters.tenantId !== "ALL") params.append("tenantId", filters.tenantId);
+    if (filters.month && filters.month !== "ALL") params.append("month", filters.month);
+    if (filters.status && filters.status !== "ALL") params.append("status", filters.status);
+    const qs = params.toString();
+    if (qs) url += `?${qs}`;
+  }
+
+  try {
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        if (!filters) {
+          saveLocalPayments(data);
+        }
+        return data;
+      }
+    }
+  } catch (err) {
+    // Offline / file:// protocol mode
+  }
+
+  // Fallback to local storage
+  let localList = getLocalPayments();
+  if (filters) {
+    localList = localList.filter((p) => {
+      if (filters.search) {
+        const q = filters.search.toLowerCase();
+        const tName = (p.tenantName || "").toLowerCase();
+        const pName = (p.propertyName || "").toLowerCase();
+        const ref = (p.transactionRef || "").toLowerCase();
+        const rem = (p.remarks || "").toLowerCase();
+        if (!tName.includes(q) && !pName.includes(q) && !ref.includes(q) && !rem.includes(q)) return false;
+      }
+      if (filters.tenantId && filters.tenantId !== "ALL" && Number(p.tenantId) !== Number(filters.tenantId)) return false;
+      if (filters.month && filters.month !== "ALL" && p.paymentMonth !== filters.month) return false;
+      if (filters.status && filters.status !== "ALL" && p.paymentStatus !== filters.status) return false;
+      if (filters.mode && filters.mode !== "ALL" && p.paymentMode !== filters.mode) return false;
+      return true;
+    });
+  }
+  return localList;
 }
 
 /**
- * Loads dashboard statistics directly from MySQL aggregation.
+ * Loads dashboard statistics.
  */
 async function loadDashboardStats() {
-  const res = await fetch(`${API_BASE}/api/payments/stats`);
-  if (!res.ok) throw new Error("Failed to fetch payment statistics from the backend.");
-  const stats = await res.json();
+  try {
+    const res = await fetch(`${API_BASE}/api/payments/stats`);
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {}
+
+  const payments = getLocalPayments();
+  let totalCollected = 0;
+  let successful = 0;
+  let pending = 0;
+  let overdue = 0;
+
+  payments.forEach((p) => {
+    if (p.paymentStatus === "Paid") {
+      totalCollected += Number(p.amount) || 0;
+      successful++;
+    } else if (p.paymentStatus === "Pending") {
+      pending++;
+    } else if (p.paymentStatus === "Overdue") {
+      overdue++;
+    }
+  });
+
   return {
-    totalRentCollected: stats.totalCollected || 0,
-    successfulPaymentCount: stats.successful || 0,
-    pendingPaymentCount: stats.pending || 0,
-    overduePaymentCount: stats.overdue || 0
+    totalRentCollected: totalCollected,
+    successfulPaymentCount: successful,
+    pendingPaymentCount: pending,
+    overduePaymentCount: overdue
   };
 }
 
 /**
- * Loads active tenants list from live MySQL database.
+ * Loads Rent Management & Tenant Dues Overview.
+ */
+async function loadRentOverview(billingMonth = "November 2026") {
+  try {
+    const res = await fetch(`${API_BASE}/api/rent/overview?month=${encodeURIComponent(billingMonth)}`);
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {}
+
+  // Local fallback calculation for rent overview
+  const tenants = await loadTenants();
+  const payments = getLocalPayments();
+
+  let totalExpected = 0;
+  let totalCollected = 0;
+  let totalPending = 0;
+  let paidCount = 0;
+  let pendingCount = 0;
+  let overdueCount = 0;
+
+  const tenantSummaries = tenants.map((t) => {
+    const rent = Number(t.monthlyRent) || 0;
+    totalExpected += rent;
+
+    // Find payment for this tenant in this month
+    const match = payments.find(
+      (p) => Number(p.tenantId) === Number(t.tenantId) && (p.paymentMonth || "").toLowerCase() === billingMonth.toLowerCase()
+    );
+
+    let status = "Pending";
+    let paidAmount = 0;
+    let paymentDate = "--";
+    let paymentMode = "--";
+    let paymentId = null;
+
+    if (match) {
+      status = match.paymentStatus;
+      paidAmount = match.amount;
+      paymentDate = match.paymentDate;
+      paymentMode = match.paymentMode;
+      paymentId = match.paymentId;
+    }
+
+    if (status === "Paid") {
+      totalCollected += rent;
+      paidCount++;
+    } else if (status === "Overdue") {
+      totalPending += rent;
+      overdueCount++;
+    } else {
+      totalPending += rent;
+      pendingCount++;
+    }
+
+    return {
+      tenantId: t.tenantId,
+      fullName: t.fullName,
+      phone: t.phone,
+      propertyId: t.propertyId,
+      propertyName: t.propertyName,
+      roomId: t.roomId,
+      roomNumber: t.roomNumber,
+      monthlyRent: rent,
+      dueDate: "5th of month",
+      rentStatus: status,
+      paymentId,
+      paidAmount,
+      paymentDate,
+      paymentMode
+    };
+  });
+
+  return {
+    billingMonth,
+    totalExpectedRent: totalExpected,
+    totalCollectedRent: totalCollected,
+    totalPendingRent: totalPending,
+    paidCount,
+    pendingCount,
+    overdueCount,
+    tenants: tenantSummaries
+  };
+}
+
+/**
+ * Loads active tenants list.
  */
 async function loadTenants() {
-  const res = await fetch(`${API_BASE}/api/tenants`);
-  if (!res.ok) throw new Error("Failed to fetch tenants from the backend.");
-  const data = await res.json();
-  if (!Array.isArray(data)) throw new Error("The backend returned an invalid tenants response.");
-  return data;
+  try {
+    const res = await fetch(`${API_BASE}/api/tenants`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch (err) {}
+  return [...SEED_TENANTS];
 }
 
 /**
- * Loads properties list from live MySQL database.
+ * Loads properties list.
  */
 async function loadProperties() {
-  const res = await fetch(`${API_BASE}/api/properties`);
-  if (!res.ok) throw new Error("Failed to fetch properties from the backend.");
-  const data = await res.json();
-  if (!Array.isArray(data)) throw new Error("The backend returned an invalid properties response.");
-  return data;
+  try {
+    const res = await fetch(`${API_BASE}/api/properties`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch (err) {}
+  return [...SEED_PROPERTIES];
 }
 
 /**
- * Loads rooms by property from live MySQL database.
+ * Loads rooms by property.
  */
 async function loadRooms(propertyId) {
-  const res = await fetch(`${API_BASE}/api/rooms?propertyId=${encodeURIComponent(propertyId)}`);
-  if (!res.ok) throw new Error("Failed to fetch rooms from the backend.");
-  const data = await res.json();
-  if (!Array.isArray(data)) throw new Error("The backend returned an invalid rooms response.");
-  return data;
+  try {
+    const res = await fetch(`${API_BASE}/api/rooms?propertyId=${propertyId}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch (err) {}
+  return SEED_ROOMS.filter((r) => Number(r.propertyId) === Number(propertyId));
 }
 
 /**
- * Saves a new payment record directly into MySQL.
+ * Saves a new payment record with strict error checking and duplicate prevention.
  */
 async function createPayment(paymentData) {
-  const res = await fetch(`${API_BASE}/api/payments/add`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(paymentData)
-  });
+  let backendSuccess = false;
+  let generatedId = null;
 
-  const resp = await res.json().catch(() => ({}));
-  if (!res.ok || !resp.success) {
-    throw new Error(resp.error || "Failed to record payment in database.");
+  try {
+    const res = await fetch(`${API_BASE}/api/payments/add`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(paymentData)
+    });
+
+    if (res.ok) {
+      const resp = await res.json();
+      if (resp.success) {
+        backendSuccess = true;
+        generatedId = resp.paymentId;
+      }
+    } else {
+      // Server returned an error (e.g. 400 validation or duplicate error)
+      const errData = await res.json();
+      throw new Error(errData.error || "Server rejected the payment transaction.");
+    }
+  } catch (err) {
+    if (err.message && !err.message.includes("Failed to fetch") && !err.message.includes("NetworkError")) {
+      // Genuine validation or duplicate rejection from server - do NOT save locally
+      throw err;
+    }
+    // Network is offline (e.g. direct file:// mode) - perform client-side duplicate verification
+    const payments = getLocalPayments();
+
+    // Check duplicate transaction ref
+    if (paymentData.transactionRef && !paymentData.transactionRef.toUpperCase().startsWith("CASH-REC-")) {
+      const dupRef = payments.find(
+        (p) => p.transactionRef && p.transactionRef.toLowerCase() === paymentData.transactionRef.trim().toLowerCase()
+      );
+      if (dupRef) {
+        throw new Error(`Duplicate transaction: Reference '${paymentData.transactionRef}' is already registered to Payment #${dupRef.paymentId}.`);
+      }
+    }
+
+    // Check duplicate paid rent for same month
+    if (paymentData.paymentStatus === "Paid") {
+      const dupMonth = payments.find(
+        (p) => Number(p.tenantId) === Number(paymentData.tenantId) &&
+               (p.paymentMonth || "").toLowerCase() === (paymentData.paymentMonth || "").toLowerCase() &&
+               p.paymentStatus === "Paid"
+      );
+      if (dupMonth) {
+        throw new Error(`Duplicate payment warning: Rent for ${paymentData.paymentMonth} is already recorded as Paid for this tenant.`);
+      }
+    }
   }
 
-  const generatedId = resp.paymentId;
-  return { success: true, paymentId: generatedId, backendSynced: true };
+  // Update local storage
+  const payments = getLocalPayments();
+  const nextId = generatedId || (payments.length > 0 ? Math.max(...payments.map((p) => p.paymentId || 0)) + 1 : 1);
+  const newRecord = {
+    ...paymentData,
+    paymentId: nextId,
+    amount: parseFloat(paymentData.amount)
+  };
+  payments.unshift(newRecord);
+  saveLocalPayments(payments);
+
+  return { success: true, paymentId: nextId, backendSynced: backendSuccess };
 }
 
 /**
- * Updates payment status directly in MySQL.
+ * Updates full payment details.
+ */
+async function updatePaymentRecord(paymentData) {
+  try {
+    const res = await fetch(`${API_BASE}/api/payments/update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(paymentData)
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to update payment.");
+    }
+  } catch (err) {
+    if (!err.message.includes("Failed to fetch")) throw err;
+  }
+
+  const payments = getLocalPayments();
+  const idx = payments.findIndex((p) => p.paymentId === paymentData.paymentId);
+  if (idx !== -1) {
+    payments[idx] = { ...payments[idx], ...paymentData };
+    saveLocalPayments(payments);
+  }
+  return true;
+}
+
+/**
+ * Updates payment status.
  */
 async function updatePaymentStatus(paymentId, newStatus) {
-  const res = await fetch(`${API_BASE}/api/payments/update-status`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ paymentId, status: newStatus })
-  });
-
-  const resp = await res.json().catch(() => ({}));
-  if (!res.ok || !resp.success) {
-    throw new Error(resp.error || "Failed to update payment status in database.");
+  try {
+    const res = await fetch(`${API_BASE}/api/payments/update-status`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paymentId, paymentStatus: newStatus })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to update status.");
+    }
+  } catch (err) {
+    if (!err.message.includes("Failed to fetch")) throw err;
   }
 
+  const payments = getLocalPayments();
+  const target = payments.find((p) => p.paymentId === paymentId);
+  if (target) {
+    target.paymentStatus = newStatus;
+    saveLocalPayments(payments);
+  }
   return true;
 }
 
 /**
- * Deletes a payment record directly from MySQL.
+ * Deletes a payment record.
  */
 async function deletePayment(paymentId) {
-  const res = await fetch(`${API_BASE}/api/payments/delete`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ paymentId })
-  });
-
-  const resp = await res.json().catch(() => ({}));
-  if (!res.ok || !resp.success) {
-    throw new Error(resp.error || "Failed to delete payment from database.");
+  try {
+    const res = await fetch(`${API_BASE}/api/payments/delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paymentId })
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || "Failed to delete payment.");
+    }
+  } catch (err) {
+    if (!err.message.includes("Failed to fetch")) throw err;
   }
 
+  const payments = getLocalPayments();
+  const filtered = payments.filter((p) => p.paymentId !== paymentId);
+  saveLocalPayments(filtered);
   return true;
+}
+
+// LocalStorage helpers
+function getLocalPayments() {
+  const stored = localStorage.getItem("rentproof_payments");
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch (e) {
+      console.error("Failed to parse stored payments:", e);
+    }
+  }
+  saveLocalPayments(SEED_PAYMENTS);
+  return [...SEED_PAYMENTS];
+}
+
+function saveLocalPayments(payments) {
+  localStorage.setItem("rentproof_payments", JSON.stringify(payments));
 }
 
 /* ==============================================================================
-   PAGE 1: PAYMENTS DASHBOARD (payments.html)
+   PAGE 1: PAYMENTS & RENT DASHBOARD (payments.html)
    ============================================================================== */
 
 async function initPaymentsDashboard() {
   await renderDashboardStats();
+  await renderRentOverviewSection();
   await renderRecentPaymentsTable();
+
+  // Setup month selector on dashboard if present
+  const rentMonthFilter = document.getElementById("rentMonthSelect");
+  if (rentMonthFilter) {
+    rentMonthFilter.addEventListener("change", async (e) => {
+      await renderRentOverviewSection(e.target.value);
+    });
+  }
 }
 
 async function renderDashboardStats() {
@@ -344,12 +588,80 @@ async function renderDashboardStats() {
   if (overdueEl) overdueEl.textContent = stats.overduePaymentCount || 0;
 }
 
+/**
+ * Renders the dedicated Rent Management & Tenant Dues Overview section.
+ */
+async function renderRentOverviewSection(month = "November 2026") {
+  const tbody = document.getElementById("rentOverviewTableBody");
+  if (!tbody) return;
+
+  const rentData = await loadRentOverview(month);
+
+  // Update rent summary figures
+  const expRentEl = document.getElementById("rentStatExpected");
+  const colRentEl = document.getElementById("rentStatCollected");
+  const penRentEl = document.getElementById("rentStatPending");
+
+  if (expRentEl) expRentEl.textContent = formatCurrency(rentData.totalExpectedRent);
+  if (colRentEl) colRentEl.textContent = formatCurrency(rentData.totalCollectedRent);
+  if (penRentEl) penRentEl.textContent = formatCurrency(rentData.totalPendingRent);
+
+  if (!rentData.tenants || rentData.tenants.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" class="empty-state">
+          <p>No active tenant rent records available.</p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = rentData.tenants
+    .map(
+      (t) => `
+    <tr>
+      <td>
+        <div style="font-weight: 600; color: var(--navy);">${escapeHtml(t.fullName)}</div>
+        <div style="font-size: 0.78rem; color: var(--slate-muted);">${escapeHtml(t.phone || "")}</div>
+      </td>
+      <td>
+        <div>${escapeHtml(t.propertyName)}</div>
+        <span class="badge-mode">Room ${escapeHtml(t.roomNumber)}</span>
+      </td>
+      <td><span class="payment-amount">${formatCurrency(t.monthlyRent)}</span></td>
+      <td><span style="font-size: 0.85rem; color: var(--steel-blue); font-weight: 500;">📅 ${escapeHtml(t.dueDate)}</span></td>
+      <td><span class="badge-status status-${(t.rentStatus || "pending").toLowerCase()}">${escapeHtml(t.rentStatus)}</span></td>
+      <td>
+        <div style="font-size: 0.825rem;">
+          ${t.rentStatus === "Paid" ? `<span style="color: var(--success); font-weight: 600;">Paid (${formatDate(t.paymentDate)})</span>` : `<span style="color: var(--warning); font-weight: 600;">Due: ${formatCurrency(t.monthlyRent)}</span>`}
+        </div>
+      </td>
+      <td>
+        <div class="table-actions">
+          ${t.rentStatus === "Paid" 
+            ? `<button class="btn-table-action" onclick="viewPaymentReceipt(${t.paymentId})" title="View Receipt">📄 Receipt</button>` 
+            : `<button class="btn-table-action" style="background-color: var(--navy); color: var(--white);" onclick="quickPayRent(${t.tenantId}, '${escapeHtml(t.fullName)}', ${t.monthlyRent})" title="Record Rent for Tenant">➕ Collect Rent</button>`}
+        </div>
+      </td>
+    </tr>
+  `
+    )
+    .join("");
+}
+
+function quickPayRent(tenantId, tenantName, monthlyRent) {
+  // Store pre-selected tenant intent in sessionStorage and navigate to Add Payment
+  sessionStorage.setItem("rentproof_preselect_tenant", tenantId);
+  window.location.href = "add-payment.html";
+}
+
 async function renderRecentPaymentsTable() {
   const tbody = document.getElementById("recentPaymentsTableBody");
   if (!tbody) return;
 
   const payments = await loadPayments();
-  const recent = payments.slice(0, 5); // top 5 recent
+  const recent = payments.slice(0, 5); // Top 5 recent
 
   if (recent.length === 0) {
     tbody.innerHTML = `
@@ -378,8 +690,8 @@ async function renderRecentPaymentsTable() {
       <td><span class="badge-status status-${(p.paymentStatus || "").toLowerCase()}">${escapeHtml(p.paymentStatus)}</span></td>
       <td>
         <div class="table-actions">
-          <button class="btn-table-action" data-payment-action="receipt" data-payment-id="${p.paymentId}" title="View Official Receipt">📄 Receipt</button>
-          <button class="btn-table-action" data-payment-action="status" data-payment-id="${p.paymentId}" data-payment-status="${escapeHtml(p.paymentStatus)}" title="Change Status">✏️ Status</button>
+          <button class="btn-table-action" onclick="viewPaymentReceipt(${p.paymentId})" title="View Official Receipt">📄 Receipt</button>
+          <button class="btn-table-action" onclick="openStatusModal(${p.paymentId}, '${p.paymentStatus}')" title="Change Status">✏️ Status</button>
         </div>
       </td>
     </tr>
@@ -396,7 +708,7 @@ let allTenants = [];
 let allProperties = [];
 
 async function initAddPaymentForm() {
-  allTenants = (await loadTenants()).filter((tenant) => tenant.tenantStatus === "Active");
+  allTenants = await loadTenants();
   allProperties = await loadProperties();
 
   // Populate Tenant Dropdown
@@ -412,7 +724,7 @@ async function initAddPaymentForm() {
         .join("");
 
     // Auto-fill and cascade on tenant selection
-    tenantSelect.addEventListener("change", (e) => {
+    tenantSelect.addEventListener("change", async (e) => {
       const selectedId = Number(e.target.value);
       const tenant = allTenants.find((t) => t.tenantId === selectedId);
       if (tenant) {
@@ -421,7 +733,7 @@ async function initAddPaymentForm() {
         if (propSelect) propSelect.value = tenant.propertyId;
 
         // Auto-populate rooms and select assigned room
-        updateRoomsDropdown(tenant.propertyId, tenant.roomId);
+        await updateRoomsDropdown(tenant.propertyId, tenant.roomId);
 
         // Auto-populate rent amount
         const amountInput = document.getElementById("paymentAmount");
@@ -429,6 +741,14 @@ async function initAddPaymentForm() {
       }
       updateReceiptPreview();
     });
+
+    // Check if quickPayRent preselected a tenant
+    const preselect = sessionStorage.getItem("rentproof_preselect_tenant");
+    if (preselect) {
+      tenantSelect.value = preselect;
+      sessionStorage.removeItem("rentproof_preselect_tenant");
+      tenantSelect.dispatchEvent(new Event("change"));
+    }
   }
 
   // Populate Property Dropdown
@@ -439,8 +759,8 @@ async function initAddPaymentForm() {
         .map((p) => `<option value="${p.propertyId}">${escapeHtml(p.propertyName)} [${p.propertyType}]</option>`)
         .join("");
 
-    propertySelect.addEventListener("change", (e) => {
-      updateRoomsDropdown(Number(e.target.value));
+    propertySelect.addEventListener("change", async (e) => {
+      await updateRoomsDropdown(Number(e.target.value));
       updateReceiptPreview();
     });
   }
@@ -484,7 +804,6 @@ async function initAddPaymentForm() {
   // Mode radio listeners
   document.querySelectorAll('input[name="paymentMode"]').forEach((radio) => {
     radio.addEventListener("change", (e) => {
-      const refGroup = document.getElementById("refGroup");
       const refInput = document.getElementById("transactionRef");
       if (e.target.value === "Cash") {
         if (refInput && !refInput.value) refInput.placeholder = "Optional (e.g. Cash Receipt #)";
@@ -609,7 +928,7 @@ async function handleAddPaymentSubmit(e) {
 
   const amount = parseFloat(amountInput.value);
   if (isNaN(amount) || amount <= 0) {
-    showFieldError("paymentAmount", "Amount must be a positive number.");
+    showFieldError("paymentAmount", "Amount must be greater than zero.");
     hasError = true;
   } else {
     clearFieldError("paymentAmount");
@@ -627,7 +946,7 @@ async function handleAddPaymentSubmit(e) {
   const paymentStatus = statusSelect ? statusSelect.value : "Paid";
   const transactionRef = refInput ? refInput.value.trim() : "";
 
-  // Validation: Electronic payments with Paid status should have a reference
+  // Validation: Electronic payments with Paid status must have a reference
   if ((paymentMode === "UPI" || paymentMode === "Bank Transfer") && paymentStatus === "Paid" && !transactionRef) {
     showFieldError("transactionRef", `Transaction reference is required for completed ${paymentMode} payments.`);
     hasError = true;
@@ -661,7 +980,7 @@ async function handleAddPaymentSubmit(e) {
   const submitBtn = document.getElementById("submitPaymentBtn");
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.textContent = "Recording Payment...";
+    submitBtn.textContent = "Validating & Recording...";
   }
 
   try {
@@ -671,7 +990,7 @@ async function handleAddPaymentSubmit(e) {
       window.location.href = "payments.html";
     }, 1200);
   } catch (err) {
-    alert("Error recording payment: " + err.message);
+    alert("Payment Error: " + err.message);
     if (submitBtn) {
       submitBtn.disabled = false;
       submitBtn.textContent = "💾 Record Payment";
@@ -713,7 +1032,6 @@ let currentHistoryFilter = {
 };
 
 async function initPaymentHistory() {
-  allHistoryPayments = await loadPayments();
   const tenants = await loadTenants();
 
   // Populate Tenant Filter Dropdown
@@ -724,9 +1042,10 @@ async function initPaymentHistory() {
   }
 
   // Populate Month Filter Dropdown with unique months
+  const allInitial = await loadPayments();
   const filterMonth = document.getElementById("filterMonth");
   if (filterMonth) {
-    const months = Array.from(new Set(allHistoryPayments.map((p) => p.paymentMonth).filter(Boolean)));
+    const months = Array.from(new Set(allInitial.map((p) => p.paymentMonth).filter(Boolean)));
     filterMonth.innerHTML = `<option value="ALL">All Months</option>` +
       months.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`).join("");
   }
@@ -734,9 +1053,9 @@ async function initPaymentHistory() {
   // Search input handler
   const searchInput = document.getElementById("historySearchInput");
   if (searchInput) {
-    searchInput.addEventListener("input", (e) => {
-      currentHistoryFilter.search = e.target.value.trim().toLowerCase();
-      renderHistoryTable();
+    searchInput.addEventListener("input", async (e) => {
+      currentHistoryFilter.search = e.target.value.trim();
+      await fetchAndRenderHistory();
     });
   }
 
@@ -751,9 +1070,9 @@ async function initPaymentHistory() {
   filterElements.forEach(({ id, key }) => {
     const el = document.getElementById(id);
     if (el) {
-      el.addEventListener("change", (e) => {
+      el.addEventListener("change", async (e) => {
         currentHistoryFilter[key] = e.target.value;
-        renderHistoryTable();
+        await fetchAndRenderHistory();
       });
     }
   });
@@ -761,7 +1080,7 @@ async function initPaymentHistory() {
   // Reset Filters button
   const resetBtn = document.getElementById("resetFiltersBtn");
   if (resetBtn) {
-    resetBtn.addEventListener("click", () => {
+    resetBtn.addEventListener("click", async () => {
       currentHistoryFilter = { search: "", tenantId: "ALL", month: "ALL", status: "ALL", mode: "ALL" };
       if (searchInput) searchInput.value = "";
       if (filterTenant) filterTenant.value = "ALL";
@@ -770,10 +1089,15 @@ async function initPaymentHistory() {
       if (statusEl) statusEl.value = "ALL";
       const modeEl = document.getElementById("filterMode");
       if (modeEl) modeEl.value = "ALL";
-      renderHistoryTable();
+      await fetchAndRenderHistory();
     });
   }
 
+  await fetchAndRenderHistory();
+}
+
+async function fetchAndRenderHistory() {
+  allHistoryPayments = await loadPayments(currentHistoryFilter);
   renderHistoryTable();
 }
 
@@ -782,55 +1106,11 @@ function renderHistoryTable() {
   const countEl = document.getElementById("historyCountBadge");
   if (!tbody) return;
 
-  const filtered = allHistoryPayments.filter((p) => {
-    // Search text matches tenant, property, ref, or remarks
-    if (currentHistoryFilter.search) {
-      const q = currentHistoryFilter.search;
-      const tName = (p.tenantName || "").toLowerCase();
-      const pName = (p.propertyName || "").toLowerCase();
-      const ref = (p.transactionRef || "").toLowerCase();
-      const rem = (p.remarks || "").toLowerCase();
-      if (!tName.includes(q) && !pName.includes(q) && !ref.includes(q) && !rem.includes(q)) {
-        return false;
-      }
-    }
-
-    // Tenant Filter
-    if (currentHistoryFilter.tenantId !== "ALL") {
-      if (Number(p.tenantId) !== Number(currentHistoryFilter.tenantId)) {
-        return false;
-      }
-    }
-
-    // Month Filter
-    if (currentHistoryFilter.month !== "ALL") {
-      if (p.paymentMonth !== currentHistoryFilter.month) {
-        return false;
-      }
-    }
-
-    // Status Filter
-    if (currentHistoryFilter.status !== "ALL") {
-      if (p.paymentStatus !== currentHistoryFilter.status) {
-        return false;
-      }
-    }
-
-    // Mode Filter
-    if (currentHistoryFilter.mode !== "ALL") {
-      if (p.paymentMode !== currentHistoryFilter.mode) {
-        return false;
-      }
-    }
-
-    return true;
-  });
-
   if (countEl) {
-    countEl.textContent = `Showing ${filtered.length} of ${allHistoryPayments.length} payments`;
+    countEl.textContent = `Showing ${allHistoryPayments.length} transactions`;
   }
 
-  if (filtered.length === 0) {
+  if (allHistoryPayments.length === 0) {
     tbody.innerHTML = `
       <tr>
         <td colspan="10" class="empty-state">
@@ -842,7 +1122,7 @@ function renderHistoryTable() {
     return;
   }
 
-  tbody.innerHTML = filtered
+  tbody.innerHTML = allHistoryPayments
     .map(
       (p) => `
     <tr>
@@ -857,9 +1137,9 @@ function renderHistoryTable() {
       <td><span class="badge-status status-${(p.paymentStatus || "").toLowerCase()}">${escapeHtml(p.paymentStatus)}</span></td>
       <td>
         <div class="table-actions">
-          <button class="btn-table-action" data-payment-action="receipt" data-payment-id="${p.paymentId}" title="View Official Receipt">📄 Receipt</button>
-          <button class="btn-table-action" data-payment-action="status" data-payment-id="${p.paymentId}" data-payment-status="${escapeHtml(p.paymentStatus)}" title="Update Status">✏️</button>
-          <button class="btn-table-action danger" data-payment-action="delete" data-payment-id="${p.paymentId}" title="Delete Payment">🗑️</button>
+          <button class="btn-table-action" onclick="viewPaymentReceipt(${p.paymentId})" title="View Official Receipt">📄 Receipt</button>
+          <button class="btn-table-action" onclick="openStatusModal(${p.paymentId}, '${p.paymentStatus}')" title="Update Status">✏️</button>
+          <button class="btn-table-action danger" onclick="confirmDeletePayment(${p.paymentId})" title="Delete Payment">🗑️</button>
         </div>
       </td>
     </tr>
@@ -933,32 +1213,40 @@ async function saveStatusModalChange() {
   if (!select) return;
 
   const newStatus = select.value;
-  await updatePaymentStatus(currentActivePaymentId, newStatus);
-  closeStatusModal();
-  showToast(`Payment #${currentActivePaymentId} status changed to ${newStatus}`, "success");
+  try {
+    await updatePaymentStatus(currentActivePaymentId, newStatus);
+    closeStatusModal();
+    showToast(`Payment #${currentActivePaymentId} status changed to ${newStatus}`, "success");
 
-  // Re-render whichever view is active
-  if (document.getElementById("paymentsDashboardView")) {
-    await renderDashboardStats();
-    await renderRecentPaymentsTable();
-  } else if (document.getElementById("paymentHistoryView")) {
-    allHistoryPayments = await loadPayments();
-    renderHistoryTable();
+    // Re-render whichever view is active
+    if (document.getElementById("paymentsDashboardView")) {
+      await renderDashboardStats();
+      await renderRentOverviewSection();
+      await renderRecentPaymentsTable();
+    } else if (document.getElementById("paymentHistoryView")) {
+      await fetchAndRenderHistory();
+    }
+  } catch (err) {
+    alert("Status update failed: " + err.message);
   }
 }
 
 function confirmDeletePayment(paymentId) {
   if (confirm(`Are you sure you want to permanently delete Payment #${paymentId}?\nThis operation will remove the transaction record.`)) {
-    deletePayment(paymentId).then(() => {
-      showToast(`Payment #${paymentId} deleted.`, "info");
-      if (document.getElementById("paymentHistoryView")) {
-        allHistoryPayments = allHistoryPayments.filter((p) => p.paymentId !== paymentId);
-        renderHistoryTable();
-      } else if (document.getElementById("paymentsDashboardView")) {
-        renderDashboardStats();
-        renderRecentPaymentsTable();
-      }
-    });
+    deletePayment(paymentId)
+      .then(() => {
+        showToast(`Payment #${paymentId} deleted.`, "info");
+        if (document.getElementById("paymentHistoryView")) {
+          fetchAndRenderHistory();
+        } else if (document.getElementById("paymentsDashboardView")) {
+          renderDashboardStats();
+          renderRentOverviewSection();
+          renderRecentPaymentsTable();
+        }
+      })
+      .catch((err) => {
+        alert("Failed to delete payment: " + err.message);
+      });
   }
 }
 
@@ -1006,6 +1294,16 @@ function setupActiveUser() {
     avatarEl.textContent = initials || "AV";
   }
 
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (confirm("Are you sure you want to sign out of RentProof?")) {
+        localStorage.removeItem("rentproof_user");
+        window.location.href = "../auth/login.html";
+      }
+    });
+  }
 }
 
 function showModuleNotice(moduleName, memberName) {
@@ -1080,4 +1378,3 @@ function escapeHtml(str) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
-

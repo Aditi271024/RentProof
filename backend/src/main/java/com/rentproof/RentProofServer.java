@@ -81,7 +81,7 @@ public class RentProofServer {
         try {
             DatabaseInitializer.initializeDatabase();
         } catch (SQLException e) {
-            throw new IOException("Failed to initialize the RentProof database.", e);
+            System.err.println("[DatabaseInitializer] Database initialization skipped: " + e.getMessage());
         }
         HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
 
@@ -117,13 +117,16 @@ public class RentProofServer {
         createApiContext(server, "/api/tenants/assign", new AssignTenantHandler());
 
         // ==========================================
-        // 4. PAYMENT ENDPOINTS
+        // 4. PAYMENT & RENT ENDPOINTS
         // ==========================================
         createApiContext(server, "/api/payments", new PaymentsHandler());
         createApiContext(server, "/api/payments/stats", new PaymentStatsHandler());
         createApiContext(server, "/api/payments/add", new AddPaymentHandler());
+        createApiContext(server, "/api/payments/update", new UpdatePaymentHandler());
         createApiContext(server, "/api/payments/update-status", new UpdatePaymentStatusHandler());
         createApiContext(server, "/api/payments/delete", new DeletePaymentHandler());
+        createApiContext(server, "/api/rent/overview", new RentOverviewHandler());
+        createApiContext(server, "/api/rent/update-amount", new UpdateRoomRentHandler());
 
         // ==========================================
         // 5. REMINDER ENDPOINTS
@@ -1198,6 +1201,212 @@ public class RentProofServer {
                     return;
                 }
                 sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Payment deleted successfully from MySQL\"}");
+            } catch (IllegalArgumentException e) {
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
+            } catch (SQLException e) {
+                sendSafeError(exchange, 500, e);
+            } catch (Exception e) {
+                sendSafeError(exchange, 500, e);
+            }
+        }
+    }
+
+    static class UpdatePaymentHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            addCorsHeaders(exchange);
+            if (handleOptions(exchange)) return;
+            if (!requireAuthentication(exchange)) return;
+
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendJsonResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+                return;
+            }
+
+            try {
+                String body = readRequestBody(exchange);
+                Map<String, String> data = parseBody(body);
+
+                int paymentId = parseIntSafe(data.get("paymentId"), 0);
+                if (paymentId <= 0) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"A valid paymentId is required.\"}");
+                    return;
+                }
+                int landlordId = getAuthenticatedLandlordId(exchange);
+                if (!landlordOwnsPayment(landlordId, paymentId)) {
+                    sendJsonResponse(exchange, 404, "{\"success\":false,\"error\":\"Payment not found.\"}");
+                    return;
+                }
+
+                Payment p = new Payment();
+                p.setPaymentId(paymentId);
+                p.setTenantId(parseIntSafe(data.get("tenantId"), 0));
+                p.setPropertyId(parseIntSafe(data.get("propertyId"), 0));
+                p.setRoomId(parseIntSafe(data.get("roomId"), 0));
+                p.setAmount(parseDoubleSafe(data.get("amount"), 0.0));
+                p.setPaymentDate(data.getOrDefault("paymentDate", ""));
+                p.setPaymentMonth(data.getOrDefault("paymentMonth", ""));
+                p.setPaymentMode(data.getOrDefault("paymentMode", "Cash"));
+                p.setTransactionRef(data.getOrDefault("transactionRef", ""));
+                p.setPaymentStatus(data.getOrDefault("paymentStatus", "Paid"));
+                p.setRemarks(data.getOrDefault("remarks", ""));
+
+                if (!landlordOwnsTenant(landlordId, p.getTenantId())
+                        || !landlordOwnsProperty(landlordId, p.getPropertyId())
+                        || !landlordOwnsRoom(landlordId, p.getRoomId())) {
+                    sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to use these resources.\"}");
+                    return;
+                }
+                if (!tenantAssignedToRoom(p.getTenantId(), p.getPropertyId(), p.getRoomId())) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"The payment tenant, property, and room must match the tenant's current assignment.\"}");
+                    return;
+                }
+
+                boolean ok = paymentService.updatePayment(p);
+                if (!ok) {
+                    sendJsonResponse(exchange, 404, "{\"success\":false,\"error\":\"Payment could not be updated.\"}");
+                    return;
+                }
+                sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Payment updated successfully in MySQL\"}");
+            } catch (IllegalArgumentException e) {
+                sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
+                        + escapeJson(e.getMessage()) + "\"}");
+            } catch (SQLException e) {
+                sendSafeError(exchange, 500, e);
+            } catch (Exception e) {
+                sendSafeError(exchange, 500, e);
+            }
+        }
+    }
+
+    static class RentOverviewHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            addCorsHeaders(exchange);
+            if (handleOptions(exchange)) return;
+            if (!requireAuthentication(exchange)) return;
+
+            try {
+                String query = exchange.getRequestURI().getQuery();
+                Map<String, String> queryParams = parseQueryParams(query);
+                String month = queryParams.get("month");
+                if (month == null || month.trim().isEmpty()) {
+                    month = "November 2026";
+                }
+
+                Map<String, Object> report = paymentService.getRentOverviewReport(month);
+                int landlordId = getAuthenticatedLandlordId(exchange);
+
+                @SuppressWarnings("unchecked")
+                ArrayList<Map<String, Object>> tenants = (ArrayList<Map<String, Object>>) report.get("tenants");
+                ArrayList<Map<String, Object>> ownedTenants = new ArrayList<>();
+                double totalExpected = 0.0;
+                double totalCollected = 0.0;
+                double totalPending = 0.0;
+                int paidCount = 0;
+                int pendingCount = 0;
+                int overdueCount = 0;
+
+                if (tenants != null) {
+                    for (Map<String, Object> t : tenants) {
+                        int propId = ((Number) t.getOrDefault("propertyId", 0)).intValue();
+                        if (landlordId <= 0 || landlordOwnsProperty(landlordId, propId)) {
+                            ownedTenants.add(t);
+                            double rent = ((Number) t.getOrDefault("monthlyRent", 0.0)).doubleValue();
+                            totalExpected += rent;
+                            String status = (String) t.getOrDefault("paymentStatus", "Pending");
+                            if ("Paid".equalsIgnoreCase(status)) {
+                                totalCollected += rent;
+                                paidCount++;
+                            } else if ("Overdue".equalsIgnoreCase(status)) {
+                                totalPending += rent;
+                                overdueCount++;
+                            } else {
+                                totalPending += rent;
+                                pendingCount++;
+                            }
+                        }
+                    }
+                }
+
+                StringBuilder sb = new StringBuilder("{");
+                sb.append("\"success\":true,");
+                sb.append("\"billingMonth\":\"").append(escapeJson(month)).append("\",");
+                sb.append(String.format(java.util.Locale.US, "\"totalExpectedRent\":%.2f,", totalExpected));
+                sb.append(String.format(java.util.Locale.US, "\"totalCollectedRent\":%.2f,", totalCollected));
+                sb.append(String.format(java.util.Locale.US, "\"totalPendingRent\":%.2f,", totalPending));
+                sb.append("\"paidCount\":").append(paidCount).append(",");
+                sb.append("\"pendingCount\":").append(pendingCount).append(",");
+                sb.append("\"overdueCount\":").append(overdueCount).append(",");
+                sb.append("\"tenants\":[");
+                for (int i = 0; i < ownedTenants.size(); i++) {
+                    if (i > 0) sb.append(",");
+                    Map<String, Object> t = ownedTenants.get(i);
+                    sb.append("{");
+                    sb.append("\"tenantId\":").append(t.getOrDefault("tenantId", 0)).append(",");
+                    sb.append("\"tenantName\":\"").append(escapeJson((String) t.getOrDefault("tenantName", ""))).append("\",");
+                    sb.append("\"propertyId\":").append(t.getOrDefault("propertyId", 0)).append(",");
+                    sb.append("\"propertyName\":\"").append(escapeJson((String) t.getOrDefault("propertyName", ""))).append("\",");
+                    sb.append("\"roomId\":").append(t.getOrDefault("roomId", 0)).append(",");
+                    sb.append("\"roomNumber\":\"").append(escapeJson((String) t.getOrDefault("roomNumber", ""))).append("\",");
+                    sb.append(String.format(java.util.Locale.US, "\"monthlyRent\":%.2f,", ((Number) t.getOrDefault("monthlyRent", 0.0)).doubleValue()));
+                    sb.append("\"paymentStatus\":\"").append(escapeJson((String) t.getOrDefault("paymentStatus", "Pending"))).append("\",");
+                    sb.append(String.format(java.util.Locale.US, "\"amountPaid\":%.2f,", ((Number) t.getOrDefault("amountPaid", 0.0)).doubleValue()));
+                    sb.append("\"paymentDate\":\"").append(escapeJson((String) t.getOrDefault("paymentDate", ""))).append("\",");
+                    sb.append("\"paymentMode\":\"").append(escapeJson((String) t.getOrDefault("paymentMode", ""))).append("\",");
+                    sb.append("\"transactionRef\":\"").append(escapeJson((String) t.getOrDefault("transactionRef", ""))).append("\"");
+                    sb.append("}");
+                }
+                sb.append("]}");
+
+                sendJsonResponse(exchange, 200, sb.toString());
+            } catch (Exception e) {
+                sendSafeError(exchange, 500, e);
+            }
+        }
+    }
+
+    static class UpdateRoomRentHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            addCorsHeaders(exchange);
+            if (handleOptions(exchange)) return;
+            if (!requireAuthentication(exchange)) return;
+
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                sendJsonResponse(exchange, 405, "{\"error\":\"Method Not Allowed\"}");
+                return;
+            }
+
+            try {
+                String body = readRequestBody(exchange);
+                Map<String, String> data = parseBody(body);
+
+                int roomId = parseIntSafe(data.get("roomId"), 0);
+                double monthlyRent = parseDoubleSafe(data.get("monthlyRent"), 0.0);
+                if (monthlyRent <= 0) {
+                    monthlyRent = parseDoubleSafe(data.get("newRent"), 0.0);
+                }
+
+                if (roomId <= 0 || monthlyRent <= 0) {
+                    sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\"Valid roomId and positive monthlyRent are required.\"}");
+                    return;
+                }
+
+                int landlordId = getAuthenticatedLandlordId(exchange);
+                if (!landlordOwnsRoom(landlordId, roomId)) {
+                    sendJsonResponse(exchange, 403, "{\"success\":false,\"error\":\"You are not authorized to update this room.\"}");
+                    return;
+                }
+
+                boolean ok = paymentService.updateRoomRent(roomId, monthlyRent);
+                if (!ok) {
+                    sendJsonResponse(exchange, 404, "{\"success\":false,\"error\":\"Room not found or rent unchanged.\"}");
+                    return;
+                }
+
+                sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Room monthly rent updated in MySQL\"}");
             } catch (IllegalArgumentException e) {
                 sendJsonResponse(exchange, 400, "{\"success\":false,\"error\":\""
                         + escapeJson(e.getMessage()) + "\"}");

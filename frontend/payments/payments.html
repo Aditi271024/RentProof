@@ -3,11 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RentProof - Payment Management</title>
-  <!-- Google Fonts: Bodoni Moda (Headings) & Poppins (UI / Body) -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
+  <title>RentProof - Payment & Rent Management</title>
   <link rel="stylesheet" href="../shared/common.css">
   <link rel="stylesheet" href="../shared/sidebar.css">
   <link rel="stylesheet" href="payments.css">
@@ -23,7 +19,7 @@
       
       <!-- Brand Logo / Header -->
       <div class="sidebar-header">
-        <a href="../dashboard/dashboard.html" class="brand-link">
+        <a href="payments.html" class="brand-link">
           <div class="brand-logo-icon">RP</div>
           <span class="brand-name">Rent<span>Proof</span></span>
         </a>
@@ -33,56 +29,56 @@
       <nav class="sidebar-nav">
         <div class="nav-section-title">Main Portal</div>
         
-        <!-- 1. Dashboard -->
-        <a href="../dashboard/dashboard.html" class="nav-item" data-tooltip="Dashboard">
-          <span class="nav-icon">📊</span>
-          <span class="nav-label">Dashboard</span>
-        </a>
-
-        <!-- 2. Properties -->
         <a href="../properties/properties.html" class="nav-item" data-tooltip="Properties">
           <span class="nav-icon">🏢</span>
           <span class="nav-label">Properties</span>
         </a>
 
-        <div class="nav-section-title">Team Modules</div>
-
-        <!-- 3. Tenants -->
-        <a href="../tenants/tenants.html" class="nav-item" data-tooltip="Tenants">
-          <span class="nav-icon">👥</span>
-          <span class="nav-label">Tenants</span>
-        </a>
-
-        <!-- 4. Rent & Payments -->
         <a href="payments.html" class="nav-item active" data-tooltip="Rent & Payments">
           <span class="nav-icon">💳</span>
           <span class="nav-label">Rent & Payments</span>
         </a>
 
-        <!-- 5. Reminders -->
-        <a href="../reminders/reminders.html" class="nav-item" data-tooltip="Reminders">
+        <a href="add-payment.html" class="nav-item" data-tooltip="Record Payment" style="padding-left: 28px; font-size: 0.88rem;">
+          <span class="nav-icon">➕</span>
+          <span class="nav-label">Record Payment</span>
+        </a>
+
+        <a href="payment-history.html" class="nav-item" data-tooltip="Payment History" style="padding-left: 28px; font-size: 0.88rem;">
+          <span class="nav-icon">📜</span>
+          <span class="nav-label">Payment History</span>
+        </a>
+
+        <div class="nav-section-title">Team Modules</div>
+
+        <!-- Shweta's Module Link -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Tenants (Shweta)" onclick="showModuleNotice('Tenants Management', 'Shweta')">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Tenants</span>
+        </a>
+
+        <!-- Gungun's Module Link -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reminders (Gungun)" onclick="showModuleNotice('Reminders & Alerts', 'Gungun')">
           <span class="nav-icon">🔔</span>
           <span class="nav-label">Reminders</span>
         </a>
 
         <div class="nav-section-title">System</div>
 
-        <!-- 6. Reports -->
-        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports">
+        <a href="payment-history.html" class="nav-item" data-tooltip="Financial Audit">
           <span class="nav-icon">📈</span>
-          <span class="nav-label">Reports</span>
+          <span class="nav-label">Financial Audit</span>
         </a>
 
-        <!-- 7. Settings -->
-        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings">
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings" onclick="alert('Settings module: Manage landlord profile and account preferences.')">
           <span class="nav-icon">⚙️</span>
           <span class="nav-label">Settings</span>
         </a>
       </nav>
 
-      <!-- 8. Sidebar Footer / Logout -->
+      <!-- Sidebar Footer / Logout -->
       <div class="sidebar-footer">
-        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Sign Out">
+        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Logout">
           <span class="nav-icon">🚪</span>
           <span class="logout-text">Sign Out</span>
         </a>
@@ -103,7 +99,7 @@
           </button>
           
           <div style="font-size: 0.95rem; font-weight: 600; color: var(--navy);">
-            RentProof &bull; <span>Payment Management</span>
+            RentProof &bull; <span>Rent &amp; Payment Management</span>
           </div>
         </div>
 
@@ -112,13 +108,13 @@
             ➕ Record Payment
           </a>
 
-          <button class="notification-btn" title="System Notifications" data-payment-action="notification">
+          <button class="notification-btn" title="System Notifications" onclick="alert('All rental payment reconciliations are up to date.')">
             🔔
             <span class="notification-badge"></span>
           </button>
 
           <!-- Landlord Profile Pill -->
-          <div class="landlord-profile-pill">
+          <div class="landlord-profile-pill" onclick="alert('Logged in: Aanvi\nRole: Payment & Finance Administrator\nModule: Payment & Rent Management')">
             <div class="profile-avatar" id="landlordAvatarInitials">AV</div>
             <div class="profile-details">
               <span class="profile-name" id="landlordDisplayName">Aanvi</span>
@@ -134,8 +130,8 @@
         <!-- Title & Action Bar -->
         <div class="page-header-bar">
           <div class="page-title-block">
-            <h1>Payment Management Dashboard</h1>
-            <p>Monitor real-time rental collections, record transactions, and maintain tenant audit history.</p>
+            <h1>Rent &amp; Payment Management</h1>
+            <p>Monitor real-time rental collections, inspect tenant monthly rent dues, and track payment receipts.</p>
           </div>
           <div style="display: flex; gap: 10px;">
             <a href="payment-history.html" class="btn btn-secondary">
@@ -199,12 +195,66 @@
         <!-- System Architecture Notice -->
         <section style="background-color: var(--white); border-left: 4px solid var(--steel-blue); border-radius: var(--radius-sm); padding: 12px 18px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; font-size: 0.85rem; box-shadow: var(--shadow-xs);">
           <div>
-            <strong>Architecture Status:</strong> MySQL Database <code>rentproof</code> &bull; Table <code>payments</code> &bull; Foreign Keys: <code>tenants</code>, <code>properties</code>, <code>rooms</code>
+            <strong>Architecture Status:</strong> MySQL <code>rentproof.payments</code> &bull; Rent Sources: <code>properties</code>, <code>rooms</code>, <code>tenants</code> &bull; Foreign Keys Enforced
           </div>
-          <span style="color: var(--steel-blue); font-weight: 600;">Core Java + JDBC Backend Active</span>
+          <span style="color: var(--steel-blue); font-weight: 600;">Core Java HTTP Server on :8080 Active</span>
         </section>
 
-        <!-- Recent Payments Table -->
+        <!-- =========================================================================
+             SECTION: RENT MANAGEMENT & TENANT DUES OVERVIEW (Step 2 Requirement)
+             ========================================================================= -->
+        <section class="table-card" style="margin-bottom: 28px;">
+          <div class="table-card-header">
+            <h3>🏠 Tenant Rent Status &amp; Dues Overview</h3>
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 0.85rem; color: var(--navy); font-weight: 600;">Cycle Month:</span>
+              <select class="filter-select" id="rentMonthSelect" style="padding: 5px 10px; font-size: 0.84rem;">
+                <option value="November 2026">November 2026</option>
+                <option value="December 2026">December 2026</option>
+                <option value="October 2026">October 2026</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Rent Mini-Metrics Bar -->
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; padding: 14px 20px; background-color: var(--ivory-card); border-bottom: 1px solid rgba(198,185,159,0.3);">
+            <div>
+              <span style="font-size: 0.78rem; color: var(--slate-muted); text-transform: uppercase; font-weight: 600;">Expected Rent (Monthly)</span>
+              <div style="font-size: 1.25rem; font-weight: 700; color: var(--navy);" id="rentStatExpected">₹0.00</div>
+            </div>
+            <div>
+              <span style="font-size: 0.78rem; color: var(--slate-muted); text-transform: uppercase; font-weight: 600;">Collected Rent</span>
+              <div style="font-size: 1.25rem; font-weight: 700; color: var(--success);" id="rentStatCollected">₹0.00</div>
+            </div>
+            <div>
+              <span style="font-size: 0.78rem; color: var(--slate-muted); text-transform: uppercase; font-weight: 600;">Pending Rent Balance</span>
+              <div style="font-size: 1.25rem; font-weight: 700; color: var(--warning);" id="rentStatPending">₹0.00</div>
+            </div>
+          </div>
+
+          <div class="payment-table-responsive">
+            <table class="payment-table">
+              <thead>
+                <tr>
+                  <th>Tenant</th>
+                  <th>Property &amp; Room</th>
+                  <th>Monthly Rent</th>
+                  <th>Due Schedule</th>
+                  <th>Status</th>
+                  <th>Settlement</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="rentOverviewTableBody">
+                <!-- Dynamically populated via payments.js -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- =========================================================================
+             SECTION: RECENT PAYMENTS AUDIT TABLE
+             ========================================================================= -->
         <section class="table-card">
           <div class="table-card-header">
             <h3>💳 Recent Payment Records</h3>
@@ -218,7 +268,7 @@
               <thead>
                 <tr>
                   <th>Payment ID</th>
-                  <th>Tenant & Property</th>
+                  <th>Tenant &amp; Property</th>
                   <th>Amount</th>
                   <th>Date</th>
                   <th>Payment Mode</th>
@@ -244,7 +294,7 @@
     <div class="modal-box">
       <div class="modal-header">
         <h3>Official Rent Receipt</h3>
-        <button class="modal-close-btn" data-payment-action="close-receipt">&times;</button>
+        <button class="modal-close-btn" onclick="closeReceiptModal()">&times;</button>
       </div>
       <div class="modal-body">
         <div class="official-receipt">
@@ -302,8 +352,8 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" data-payment-action="close-receipt">Close</button>
-        <button class="btn btn-primary" data-payment-action="print-receipt">🖨️ Print Receipt</button>
+        <button class="btn btn-secondary" onclick="closeReceiptModal()">Close</button>
+        <button class="btn btn-primary" onclick="printReceipt()">🖨️ Print Receipt</button>
       </div>
     </div>
   </div>
@@ -315,7 +365,7 @@
     <div class="modal-box" style="max-width: 420px;">
       <div class="modal-header">
         <h3>Update Payment Status</h3>
-        <button class="modal-close-btn" data-payment-action="close-status">&times;</button>
+        <button class="modal-close-btn" onclick="closeStatusModal()">&times;</button>
       </div>
       <div class="modal-body">
         <div class="form-group">
@@ -332,14 +382,12 @@
         </p>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" data-payment-action="close-status">Cancel</button>
-        <button class="btn btn-primary" data-payment-action="save-status">Save Status</button>
+        <button class="btn btn-secondary" onclick="closeStatusModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveStatusModalChange()">Save Status</button>
       </div>
     </div>
   </div>
 
-  <script src="../shared/security.js"></script>
   <script src="payments.js"></script>
 </body>
 </html>
-

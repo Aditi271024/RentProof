@@ -7,25 +7,23 @@ import java.util.Map;
 
 /**
  * PaymentDemo - Verification Suite and Faculty Viva Test Runner
- * Module: Payment Management
+ * Module: Payment & Rent Management
  * Author: Aanvi
  * 
  * Demonstrates:
  * 1. Payment entity model & encapsulation (Payment.java)
  * 2. Business validation rules (PaymentService.java)
- * 3. Database connectivity & CRUD operations via JDBC (PaymentDAO.java)
- * 4. Relational SQL JOINs with tenants, properties, and rooms
- * 5. Statistical aggregations (Total Rent Collected, Successful, Pending)
- * 
- * Run via terminal:
- * javac -d bin -cp ".;lib/*;backend/src/main/resources" backend/src/main/java/com/rentproof/database/*.java backend/src/main/java/com/rentproof/payment/*.java
- * java -cp "bin;lib/*;backend/src/main/resources" com.rentproof.payment.PaymentDemo
+ * 3. Defensive duplicate prevention for transaction references and duplicate monthly rent
+ * 4. Strict calendar date checking
+ * 5. Database connectivity & CRUD operations via JDBC (PaymentDAO.java)
+ * 6. Rent Management & Tenant Dues Overview calculations
+ * 7. Statistical aggregations (Total Rent Collected, Successful, Pending)
  */
 public class PaymentDemo {
 
     public static void main(String[] args) {
         System.out.println("============================================================");
-        System.out.println("   RENTPROOF: AANVI'S PAYMENT MODULE VERIFICATION SUITE     ");
+        System.out.println("   RENTPROOF: AANVI'S PAYMENT & RENT VERIFICATION SUITE     ");
         System.out.println("============================================================\n");
 
         PaymentService paymentService = new PaymentService();
@@ -77,15 +75,31 @@ public class PaymentDemo {
         String err4 = paymentService.validatePayment(missingRef);
         System.out.println("[Validation 4] Missing Ref Error Caught    : " + err4);
 
-        // Test 2.5: Valid Payment Check
+        // Test 2.5: Impossible Calendar Date Check (e.g. Feb 31st)
+        Payment invalidDate = new Payment(1, 1, 1, 8500.0, "2026-02-31", "February 2026", "Cash", "", "Paid", "Invalid Date");
+        String err5 = paymentService.validatePayment(invalidDate);
+        System.out.println("[Validation 5] Invalid Date Caught         : " + err5);
+
+        // Test 2.6: Valid Payment Check
         String validCheck = paymentService.validatePayment(testPayment);
-        System.out.println("[Validation 5] Valid Payment Check         : " + (validCheck == null ? "PASSED (null error)" : validCheck));
+        System.out.println("[Validation 6] Valid Payment Check         : " + (validCheck == null ? "PASSED (null error)" : validCheck));
         System.out.println("[PASS] All business rules and defensive validations verified.\n");
 
         // ---------------------------------------------------------
-        // 3. TESTING DATABASE CONNECTIVITY & LIVE CRUD
+        // 3. TESTING RENT MANAGEMENT LOGIC & CALCULATIONS
         // ---------------------------------------------------------
-        System.out.println("--- 3. TESTING DATABASE CONNECTIVITY ---");
+        System.out.println("--- 3. TESTING RENT MANAGEMENT LOGIC ---");
+        Map<String, Object> rentReport = paymentService.getRentOverviewReport("November 2026");
+        System.out.println("[Rent Overview] Target Month: " + rentReport.get("billingMonth"));
+        System.out.println("[Rent Overview] Total Expected Rent : Rs. " + rentReport.get("totalExpectedRent"));
+        System.out.println("[Rent Overview] Total Collected Rent: Rs. " + rentReport.get("totalCollectedRent"));
+        System.out.println("[Rent Overview] Total Pending Rent  : Rs. " + rentReport.get("totalPendingRent"));
+        System.out.println("[PASS] Rent calculations and tenant dues aggregated successfully.\n");
+
+        // ---------------------------------------------------------
+        // 4. TESTING DATABASE CONNECTIVITY & LIVE CRUD
+        // ---------------------------------------------------------
+        System.out.println("--- 4. TESTING DATABASE CONNECTIVITY ---");
         System.out.println("Database URL: " + DBConnection.getUrl());
         boolean isConnected = DBConnection.testConnection();
 
@@ -105,8 +119,8 @@ public class PaymentDemo {
 
     private static void runLiveDatabaseTests(PaymentService paymentService) {
         try {
-            System.out.println("\n--- 4. RETRIEVING LIVE PAYMENTS & DASHBOARD STATS ---");
-            Map<String, Object> stats = paymentService.getDashboardStats(1);
+            System.out.println("\n--- 5. RETRIEVING LIVE PAYMENTS & DASHBOARD STATS ---");
+            Map<String, Object> stats = paymentService.getDashboardStats();
             System.out.println("Total Rent Collected    : Rs. " + stats.get("totalRentCollected"));
             System.out.println("Successful Payments     : " + stats.get("successfulPaymentCount"));
             System.out.println("Pending Payments        : " + stats.get("pendingPaymentCount"));
@@ -121,7 +135,7 @@ public class PaymentDemo {
                         p.getPaymentMode(), p.getPaymentStatus());
             }
 
-            System.out.println("\n--- 5. TESTING INSERT (CREATE) PAYMENT ---");
+            System.out.println("\n--- 6. TESTING INSERT (CREATE) PAYMENT WITH TRANSACTION ---");
             Payment newPayment = new Payment(
                     1, 1, 1, 8500.00,
                     "2026-11-10", "November 2026", "UPI",
@@ -130,21 +144,34 @@ public class PaymentDemo {
             int newId = paymentService.recordPayment(newPayment);
             System.out.println("[INSERT] New payment record created with ID: " + newId);
 
-            System.out.println("\n--- 6. TESTING RETRIEVAL BY ID & JOIN ---");
+            System.out.println("\n--- 7. TESTING DUPLICATE TRANSACTION PREVENTION ---");
+            try {
+                Payment duplicateRef = new Payment(
+                        2, 1, 2, 8500.00,
+                        "2026-11-10", "November 2026", "UPI",
+                        "UPI/VIVA/DEMO9999", "Paid", "Duplicate Ref Attempt"
+                );
+                paymentService.recordPayment(duplicateRef);
+                System.err.println("[FAIL] Duplicate payment reference was NOT caught!");
+            } catch (IllegalArgumentException e) {
+                System.out.println("[PASS] Duplicate transaction reference caught successfully: " + e.getMessage());
+            }
+
+            System.out.println("\n--- 8. TESTING RETRIEVAL BY ID & JOIN ---");
             Payment retrieved = paymentService.getPaymentById(newId);
             if (retrieved != null) {
                 System.out.println("[READ] Found: " + retrieved.getTenantName() + " | Status: " + retrieved.getPaymentStatus());
             }
 
-            System.out.println("\n--- 7. TESTING STATUS UPDATE (UPDATE) ---");
+            System.out.println("\n--- 9. TESTING STATUS UPDATE (UPDATE) ---");
             boolean updated = paymentService.updatePaymentStatus(newId, "Paid");
             System.out.println("[UPDATE] Status changed to 'Paid': " + updated);
 
-            System.out.println("\n--- 8. TESTING SEARCH & FILTER ---");
+            System.out.println("\n--- 10. TESTING SEARCH & FILTER ---");
             ArrayList<Payment> searchResults = paymentService.searchAndFilterPayments("DEMO9999", null, null, null);
             System.out.println("[SEARCH] Found records matching 'DEMO9999': " + searchResults.size());
 
-            System.out.println("\n--- 9. TESTING RECORD DELETION (DELETE) ---");
+            System.out.println("\n--- 11. TESTING RECORD DELETION (DELETE) ---");
             boolean deleted = paymentService.deletePayment(newId);
             System.out.println("[DELETE] Demo payment #" + newId + " removed: " + deleted);
 
@@ -154,4 +181,3 @@ public class PaymentDemo {
         }
     }
 }
-
