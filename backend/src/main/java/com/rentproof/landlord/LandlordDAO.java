@@ -7,6 +7,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Locale;
 
 /**
  * LandlordDAO handles Data Access Object operations for the 'landlords' table.
@@ -37,7 +38,7 @@ public class LandlordDAO {
              PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             pstmt.setString(1, landlord.getFullName());
-            pstmt.setString(2, landlord.getEmail().toLowerCase().trim());
+            pstmt.setString(2, landlord.getEmail().trim().toLowerCase(Locale.ROOT));
             pstmt.setString(3, landlord.getPhone().trim());
             pstmt.setString(4, landlord.getPasswordHash());
             pstmt.setString(5, landlord.getPasswordSalt());
@@ -56,7 +57,7 @@ public class LandlordDAO {
             }
             return -1;
         } catch (SQLException e) {
-            System.err.println("[LandlordDAO] registerLandlord failed: " + e.getMessage());
+            System.err.println("[LandlordDAO] registerLandlord failed: " + e.getClass().getSimpleName());
             throw e;
         }
     }
@@ -74,7 +75,7 @@ public class LandlordDAO {
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
-            pstmt.setString(1, email.toLowerCase().trim());
+            pstmt.setString(1, email.trim().toLowerCase(Locale.ROOT));
 
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
@@ -82,7 +83,7 @@ public class LandlordDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[LandlordDAO] getLandlordByEmail failed for " + email + ": " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve landlord authentication data.", e);
         }
         return null;
     }
@@ -107,7 +108,7 @@ public class LandlordDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[LandlordDAO] getLandlordById failed for ID " + landlordId + ": " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve landlord profile.", e);
         }
         return null;
     }
@@ -131,7 +132,7 @@ public class LandlordDAO {
             int rowsUpdated = pstmt.executeUpdate();
             return rowsUpdated > 0;
         } catch (SQLException e) {
-            System.err.println("[LandlordDAO] updateLandlord failed: " + e.getMessage());
+            System.err.println("[LandlordDAO] updateLandlord failed: " + e.getClass().getSimpleName());
             return false;
         }
     }

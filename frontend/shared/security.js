@@ -1,6 +1,8 @@
 (function () {
   const nativeFetch = window.fetch.bind(window);
   let csrfTokenPromise;
+  let csrfTokenFetchedAt = 0;
+  const csrfTokenRefreshMs = 20 * 60 * 1000;
 
   function isApiRequest(input) {
     const url = input instanceof Request ? input.url : input;
@@ -9,7 +11,8 @@
   }
 
   async function getCsrfToken() {
-    if (!csrfTokenPromise) {
+    if (!csrfTokenPromise || Date.now() - csrfTokenFetchedAt >= csrfTokenRefreshMs) {
+      csrfTokenFetchedAt = Date.now();
       csrfTokenPromise = nativeFetch("/api/auth/csrf", {
         credentials: "same-origin",
         cache: "no-store"
@@ -20,6 +23,7 @@
         return data.csrfToken;
       }).catch((error) => {
         csrfTokenPromise = null;
+        csrfTokenFetchedAt = 0;
         throw error;
       });
     }
@@ -30,15 +34,25 @@
     const requestInit = Object.assign({}, init || {});
     const requestMethod = (requestInit.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
     const isApi = isApiRequest(input);
+    let csrfHeaders;
     if (isApi) requestInit.credentials = requestInit.credentials || "same-origin";
 
     if (isApi && ["POST", "PUT", "DELETE"].includes(requestMethod)) {
-      const headers = new Headers(requestInit.headers || (input instanceof Request ? input.headers : undefined));
-      headers.set("X-CSRF-Token", await getCsrfToken());
-      requestInit.headers = headers;
+      csrfHeaders = new Headers(requestInit.headers || (input instanceof Request ? input.headers : undefined));
+      csrfHeaders.set("X-CSRF-Token", await getCsrfToken());
+      requestInit.headers = csrfHeaders;
     }
 
-    const response = await nativeFetch(input, requestInit);
+    let response = await nativeFetch(input, requestInit);
+    if (isApi && ["POST", "PUT", "DELETE"].includes(requestMethod)
+        && response.status === 403 && !(input instanceof Request)) {
+      csrfTokenPromise = null;
+      csrfTokenFetchedAt = 0;
+      csrfHeaders.set("X-CSRF-Token", await getCsrfToken());
+      requestInit.headers = csrfHeaders;
+      response = await nativeFetch(input, requestInit);
+    }
+
     const path = window.location.pathname;
     const isAuthPage = path.startsWith("/frontend/auth/");
     if (isApi && response.status === 401 && !isAuthPage) {
@@ -78,6 +92,7 @@
     if (!response.ok) throw new Error("The server did not invalidate the session.");
     localStorage.removeItem("rentproof_user");
     csrfTokenPromise = null;
+    csrfTokenFetchedAt = 0;
     window.location.replace("/frontend/auth/login.html");
   }
 

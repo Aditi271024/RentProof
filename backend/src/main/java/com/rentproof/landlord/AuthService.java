@@ -7,8 +7,9 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
-import java.util.Base64;
 import java.sql.SQLException;
+import java.util.Base64;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
@@ -16,7 +17,7 @@ import java.util.regex.Pattern;
  * 
  * Responsibilities:
  * - Registration validation (email format, 10-digit phone, password length & confirmation)
- * - Cryptographic password hashing (SHA-256)
+ * - Salted PBKDF2 password hashing (HMAC-SHA-256)
  * - User login verification against database
  * - Protection against plaintext password storage
  * 
@@ -35,6 +36,14 @@ public class AuthService {
     public static final int SALT_BYTES = 16;
 
     private final LandlordDAO landlordDAO;
+    private static final String DUPLICATE_ACCOUNT_MESSAGE =
+            "An account with this email already exists. Please login instead.";
+
+    public static final class DuplicateAccountException extends IllegalArgumentException {
+        public DuplicateAccountException() {
+            super(DUPLICATE_ACCOUNT_MESSAGE);
+        }
+    }
 
     // Email regex pattern conforming to standard email specifications
     private static final Pattern EMAIL_PATTERN = Pattern.compile(
@@ -91,7 +100,7 @@ public class AuthService {
         // Check if email already exists in database
         Landlord existing = landlordDAO.getLandlordByEmail(email);
         if (existing != null) {
-            return "An account with email '" + email + "' already exists. Please login instead.";
+            return DUPLICATE_ACCOUNT_MESSAGE;
         }
 
         return null; // Valid
@@ -118,7 +127,7 @@ public class AuthService {
     }
 
     /**
-     * Registers a new Landlord account with encrypted password storage.
+     * Registers a new landlord account with salted password-hash storage.
      * 
      * @return registered Landlord object with generated ID
      * @throws IllegalArgumentException if input validation fails
@@ -129,6 +138,9 @@ public class AuthService {
         // Step 1: Validate inputs
         String validationError = validateRegistration(fullName, email, phone, plainPassword, confirmPassword);
         if (validationError != null) {
+            if (DUPLICATE_ACCOUNT_MESSAGE.equals(validationError)) {
+                throw new DuplicateAccountException();
+            }
             throw new IllegalArgumentException(validationError);
         }
 
@@ -139,7 +151,7 @@ public class AuthService {
         // Step 3: Instantiate Landlord model
         Landlord newLandlord = new Landlord(
                 fullName.trim(),
-                email.toLowerCase().trim(),
+                email.trim().toLowerCase(Locale.ROOT),
                 phone.trim(),
                 passwordHash
         );
@@ -150,7 +162,6 @@ public class AuthService {
         int generatedId = landlordDAO.registerLandlord(newLandlord);
         if (generatedId > 0) {
             newLandlord.setLandlordId(generatedId);
-            System.out.println("[AuthService] Registered new landlord successfully with ID: " + generatedId);
             return newLandlord;
         } else {
             throw new SQLException("Failed to save landlord record to database.");
@@ -167,13 +178,11 @@ public class AuthService {
     public Landlord login(String email, String plainPassword) {
         String validationError = validateLogin(email, plainPassword);
         if (validationError != null) {
-            System.err.println("[AuthService] Login validation failed: " + validationError);
             return null;
         }
 
         Landlord landlord = landlordDAO.getLandlordByEmail(email);
         if (landlord == null) {
-            System.err.println("[AuthService] Login failed: No account registered for " + email);
             return null;
         }
 
@@ -196,10 +205,8 @@ public class AuthService {
         }
 
         if (matches) {
-            System.out.println("[AuthService] Landlord authenticated successfully: " + landlord.getFullName());
             return landlord;
         } else {
-            System.err.println("[AuthService] Login failed: Incorrect password for " + email);
             return null;
         }
     }
