@@ -26,6 +26,7 @@ import java.util.regex.Pattern;
 public class PropertyService {
 
     private final PropertyDAO propertyDAO;
+    private final RoomDAO roomDAO;
 
     // Indian 6-digit postal PIN code format
     private static final Pattern PINCODE_PATTERN = Pattern.compile("^[1-9][0-9]{5}$");
@@ -35,10 +36,17 @@ public class PropertyService {
 
     public PropertyService() {
         this.propertyDAO = new PropertyDAO();
+        this.roomDAO = new RoomDAO();
     }
 
     public PropertyService(PropertyDAO propertyDAO) {
         this.propertyDAO = propertyDAO;
+        this.roomDAO = new RoomDAO();
+    }
+
+    public PropertyService(PropertyDAO propertyDAO, RoomDAO roomDAO) {
+        this.propertyDAO = propertyDAO;
+        this.roomDAO = roomDAO;
     }
 
     /**
@@ -83,8 +91,9 @@ public class PropertyService {
             return "Total rooms must be at least 1.";
         }
 
-        if (property.getMonthlyRent() < 0) {
-            return "Monthly rent cannot be negative.";
+        if (!Double.isFinite(property.getMonthlyRent()) || property.getMonthlyRent() < 0
+                || property.getMonthlyRent() > 99999999.99) {
+            return "Monthly rent must be between 0 and 99,999,999.99.";
         }
 
         return null; // All validation checks passed
@@ -149,6 +158,18 @@ public class PropertyService {
         } else {
             throw new SQLException("Failed to add property to database.");
         }
+    }
+
+    public int addPropertyWithInitialRooms(Property property, int landlordId) throws SQLException {
+        if (property == null) {
+            throw new IllegalArgumentException("Property object cannot be null.");
+        }
+        property.setLandlordId(landlordId);
+        String validationError = validateProperty(property);
+        if (validationError != null) {
+            throw new IllegalArgumentException(validationError);
+        }
+        return propertyDAO.addPropertyWithInitialRooms(property);
     }
 
     /**
@@ -216,11 +237,114 @@ public class PropertyService {
      * @param landlordId requesting landlord ID
      * @return Property if found and authorized, or null
      */
-    public Property getProperty(int propertyId, int landlordId) {
-        Property property = propertyDAO.getPropertyById(propertyId);
-        if (property != null && property.getLandlordId() == landlordId) {
-            return property;
+    /**
+     * Fetches a single property by ID without restricting to a specific landlord.
+     */
+    public Property getPropertyById(int propertyId) {
+        return propertyDAO.getPropertyById(propertyId);
+    }
+
+    /**
+     * Fetches all properties in the system.
+     */
+    public ArrayList<Property> getAllProperties() {
+        return propertyDAO.getAllProperties();
+    }
+
+    // ==========================================
+    // ROOM MANAGEMENT METHODS
+    // ==========================================
+
+    public ArrayList<Room> getRoomsByProperty(int propertyId) throws SQLException {
+        return roomDAO.getRoomsByPropertyId(propertyId);
+    }
+
+    public ArrayList<Room> getAllRooms() throws SQLException {
+        return roomDAO.getAllRooms();
+    }
+
+    public Room getRoomById(int roomId) throws SQLException {
+        return roomDAO.getRoomById(roomId);
+    }
+
+    public ArrayList<Room> getVacantRoomsByProperty(int propertyId) throws SQLException {
+        return roomDAO.getVacantRoomsByPropertyId(propertyId);
+    }
+
+    public int addRoom(Room room) throws SQLException {
+        if (room == null || room.getRoomNumber() == null || room.getRoomNumber().trim().isEmpty()) {
+            throw new IllegalArgumentException("Room number is required.");
         }
-        return null;
+        if (room.getPropertyId() <= 0) {
+            throw new IllegalArgumentException("Valid Property ID is required for a room.");
+        }
+        validateRoomFields(room);
+        if (room.getRoomStatus() != null && !room.getRoomStatus().trim().isEmpty()
+                && !"Vacant".equalsIgnoreCase(room.getRoomStatus().trim())) {
+            throw new IllegalArgumentException("New rooms must start as Vacant.");
+        }
+        room.setRoomStatus("Vacant");
+        return roomDAO.addRoom(room);
+    }
+
+    public boolean updateRoom(Room room) throws SQLException {
+        if (room == null || room.getRoomId() <= 0) {
+            throw new IllegalArgumentException("Valid Room ID is required for update.");
+        }
+        validateRoomFields(room);
+        String status = normalizeRoomStatus(room.getRoomStatus());
+        boolean hasActiveTenant = roomDAO.hasActiveTenant(room.getRoomId());
+        if (hasActiveTenant && !"Occupied".equals(status)) {
+            throw new IllegalArgumentException("A room assigned to an active tenant must remain Occupied.");
+        }
+        if (!hasActiveTenant && "Occupied".equals(status)) {
+            throw new IllegalArgumentException("Assign a tenant before marking a room Occupied.");
+        }
+        room.setRoomStatus(status);
+        return roomDAO.updateRoom(room);
+    }
+
+    public boolean updateRoomStatus(int roomId, String status) throws SQLException {
+        if (roomId <= 0) {
+            throw new IllegalArgumentException("Valid Room ID is required for status update.");
+        }
+        String normalizedStatus = normalizeRoomStatus(status);
+        boolean hasActiveTenant = roomDAO.hasActiveTenant(roomId);
+        if (hasActiveTenant && !"Occupied".equals(normalizedStatus)) {
+            throw new IllegalArgumentException("A room assigned to an active tenant must remain Occupied.");
+        }
+        if (!hasActiveTenant && "Occupied".equals(normalizedStatus)) {
+            throw new IllegalArgumentException("Assign a tenant before marking a room Occupied.");
+        }
+        return roomDAO.updateRoomStatus(roomId, normalizedStatus);
+    }
+
+    public boolean deleteRoom(int roomId) throws SQLException {
+        return roomDAO.deleteRoom(roomId);
+    }
+
+    private void validateRoomFields(Room room) {
+        if (room.getRoomNumber() == null || room.getRoomNumber().trim().isEmpty()) {
+            throw new IllegalArgumentException("Room number is required.");
+        }
+        String roomNumber = room.getRoomNumber().trim();
+        if (roomNumber.length() > 20) {
+            throw new IllegalArgumentException("Room number cannot exceed 20 characters.");
+        }
+        room.setRoomNumber(roomNumber);
+        double monthlyRent = room.getMonthlyRent();
+        if (!Double.isFinite(monthlyRent) || monthlyRent < 0 || monthlyRent > 99999999.99) {
+            throw new IllegalArgumentException("Monthly rent must be between 0 and 99,999,999.99.");
+        }
+    }
+
+    private String normalizeRoomStatus(String status) {
+        if (status != null) {
+            String value = status.trim();
+            if ("Vacant".equalsIgnoreCase(value)) return "Vacant";
+            if ("Occupied".equalsIgnoreCase(value)) return "Occupied";
+            if ("Maintenance".equalsIgnoreCase(value)) return "Maintenance";
+        }
+        throw new IllegalArgumentException("Room status must be Vacant, Occupied, or Maintenance.");
     }
 }

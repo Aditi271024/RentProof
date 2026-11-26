@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentProof - Room Management</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="../shared/sidebar.css">
+  <link rel="stylesheet" href="properties.css">
+  <link rel="stylesheet" href="rooms.css">
+</head>
+<body>
+  <div class="app-container">
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <a href="../dashboard/dashboard.html" class="brand-link">
+          <div class="brand-logo-icon">RP</div>
+          <span class="brand-name">Rent<span>Proof</span></span>
+        </a>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Portal</div>
+        <a href="../dashboard/dashboard.html" class="nav-item" data-tooltip="Dashboard">
+          <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
+        </a>
+        <a href="properties.html" class="nav-item active" data-tooltip="Properties">
+          <span class="nav-icon">🏢</span><span class="nav-label">Properties</span>
+        </a>
+        <div class="nav-section-title">Team Modules</div>
+        <a href="../tenants/tenants.html" class="nav-item" data-tooltip="Tenants">
+          <span class="nav-icon">👥</span><span class="nav-label">Tenants</span>
+        </a>
+        <a href="../payments/payments.html" class="nav-item" data-tooltip="Rent & Payments">
+          <span class="nav-icon">💳</span><span class="nav-label">Rent & Payments</span>
+        </a>
+        <a href="../reminders/reminders.html" class="nav-item" data-tooltip="Reminders">
+          <span class="nav-icon">🔔</span><span class="nav-label">Reminders</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Sign Out">
+          <span class="nav-icon">🚪</span><span class="logout-text">Sign Out</span>
+        </a>
+      </div>
+    </aside>
+
+    <div class="main-wrapper">
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" type="button" title="Toggle Navigation Sidebar">☰</button>
+          <h1 class="rooms-page-title">Room Management</h1>
+        </div>
+        <div class="navbar-right">
+          <div class="landlord-profile-pill">
+            <div class="profile-avatar" id="landlordAvatarInitials">RP</div>
+            <div class="profile-details">
+              <span class="profile-name" id="landlordDisplayName">Landlord</span>
+              <span class="profile-role">Landlord &bull; Active</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="page-content">
+        <div class="rooms-page-container">
+          <div class="page-header-bar">
+            <div class="page-title-block">
+              <h1>Manage Rooms</h1>
+              <p>Add, update, and review room inventory for your property.</p>
+            </div>
+            <a href="properties.html" class="btn btn-secondary">← Back to Properties</a>
+          </div>
+
+          <div id="roomPageError" class="rooms-message rooms-message-error" role="alert" hidden></div>
+          <div id="roomPageStatus" class="rooms-message" role="status" aria-live="polite"></div>
+
+          <section class="rooms-panel">
+            <div class="rooms-panel-header">
+              <h2>Property</h2>
+              <label for="roomPropertySelect">Select property</label>
+            </div>
+            <select id="roomPropertySelect" class="form-control" required disabled>
+              <option value="">Loading properties...</option>
+            </select>
+          </section>
+
+          <section class="rooms-panel">
+            <div class="rooms-panel-header">
+              <h2>Add a Room</h2>
+              <p>New rooms start as Vacant. Tenant assignment controls Occupied status.</p>
+            </div>
+            <form id="addRoomForm" novalidate>
+              <div class="rooms-form-grid">
+                <div class="form-group">
+                  <label for="addRoomNumber">Room number <span class="required">*</span></label>
+                  <input id="addRoomNumber" class="form-control" type="text" maxlength="20" required>
+                </div>
+                <div class="form-group">
+                  <label for="addRoomRent">Monthly rent (₹) <span class="required">*</span></label>
+                  <input id="addRoomRent" class="form-control" type="number" min="0" step="0.01" required>
+                </div>
+                <div class="rooms-form-action">
+                  <button class="btn btn-primary" type="submit" id="addRoomButton">Add Room</button>
+                </div>
+              </div>
+            </form>
+          </section>
+
+          <section class="rooms-panel">
+            <div class="rooms-panel-header rooms-list-header">
+              <div>
+                <h2>Rooms</h2>
+                <p id="roomsPropertyLabel">Select a property to view its rooms.</p>
+              </div>
+              <button class="btn btn-outline btn-sm" type="button" id="refreshRoomsButton">Refresh</button>
+            </div>
+            <div id="roomsEmptyState" class="rooms-empty-state" hidden>
+              <h3>No rooms found</h3>
+              <p>Add the first room for this property using the form above.</p>
+            </div>
+            <div class="rooms-table-wrap">
+              <table class="rooms-table">
+                <thead>
+                  <tr>
+                    <th>Room</th>
+                    <th>Monthly rent</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="roomsTableBody"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <div class="rooms-modal" id="editRoomModal" aria-hidden="true">
+    <section class="rooms-modal-card" role="dialog" aria-modal="true" aria-labelledby="editRoomTitle">
+      <div class="rooms-modal-header">
+        <h2 id="editRoomTitle">Edit Room</h2>
+        <button class="rooms-icon-button" type="button" data-room-action="close-edit" aria-label="Close edit dialog">&times;</button>
+      </div>
+      <form id="editRoomForm">
+        <input id="editRoomId" type="hidden">
+        <div class="form-group">
+          <label for="editRoomNumber">Room number <span class="required">*</span></label>
+          <input id="editRoomNumber" class="form-control" type="text" maxlength="20" required>
+        </div>
+        <div class="form-group">
+          <label for="editRoomRent">Monthly rent (₹) <span class="required">*</span></label>
+          <input id="editRoomRent" class="form-control" type="number" min="0" step="0.01" required>
+        </div>
+        <div class="form-group">
+          <label for="editRoomStatus">Status</label>
+          <select id="editRoomStatus" class="form-control">
+            <option value="Vacant">Vacant</option>
+            <option value="Occupied">Occupied</option>
+            <option value="Maintenance">Maintenance</option>
+          </select>
+          <small>Occupied status is maintained by tenant assignment.</small>
+        </div>
+        <div id="editRoomError" class="rooms-message rooms-message-error" role="alert" hidden></div>
+        <div class="rooms-modal-actions">
+          <button class="btn btn-secondary" type="button" data-room-action="close-edit">Cancel</button>
+          <button class="btn btn-primary" type="submit" id="saveRoomButton">Save Changes</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <script src="../shared/security.js"></script>
+  <script src="rooms.js"></script>
+</body>
+</html>

@@ -66,6 +66,62 @@ public class PropertyDAO {
         }
     }
 
+    public int addPropertyWithInitialRooms(Property property) throws SQLException {
+        String propertySql = "INSERT INTO properties (landlord_id, property_name, property_type, address, "
+                + "city, state, pincode, total_rooms, monthly_rent, description) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String roomSql = "INSERT INTO rooms (property_id, room_number, monthly_rent, room_status) "
+                + "VALUES (?, ?, ?, 'Vacant')";
+
+        try (Connection conn = DBConnection.getConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement propertyStatement = conn.prepareStatement(
+                    propertySql, Statement.RETURN_GENERATED_KEYS)) {
+                propertyStatement.setInt(1, property.getLandlordId());
+                propertyStatement.setString(2, property.getPropertyName().trim());
+                propertyStatement.setString(3, property.getPropertyType().trim());
+                propertyStatement.setString(4, property.getAddress().trim());
+                propertyStatement.setString(5, property.getCity().trim());
+                propertyStatement.setString(6, property.getState().trim());
+                propertyStatement.setString(7, property.getPincode().trim());
+                propertyStatement.setInt(8, property.getTotalRooms());
+                propertyStatement.setDouble(9, property.getMonthlyRent());
+                propertyStatement.setString(10, property.getDescription());
+
+                if (propertyStatement.executeUpdate() != 1) {
+                    throw new SQLException("Property insert did not create a record.");
+                }
+
+                int propertyId;
+                try (ResultSet keys = propertyStatement.getGeneratedKeys()) {
+                    if (!keys.next() || (propertyId = keys.getInt(1)) <= 0) {
+                        throw new SQLException("Property insert did not return a generated ID.");
+                    }
+                }
+
+                try (PreparedStatement roomStatement = conn.prepareStatement(roomSql)) {
+                    for (int room = 1; room <= property.getTotalRooms(); room++) {
+                        roomStatement.setInt(1, propertyId);
+                        roomStatement.setString(2, "Room " + (room < 10 ? "0" + room : room));
+                        roomStatement.setDouble(3, property.getMonthlyRent());
+                        roomStatement.addBatch();
+                    }
+                    int[] roomRows = roomStatement.executeBatch();
+                    if (roomRows.length != property.getTotalRooms()) {
+                        throw new SQLException("Initial room creation was incomplete.");
+                    }
+                }
+
+                conn.commit();
+                property.setPropertyId(propertyId);
+                return propertyId;
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            }
+        }
+    }
+
     /**
      * Retrieves all properties across the system (System Administrator / Debug
      * view).
@@ -86,7 +142,7 @@ public class PropertyDAO {
                 list.add(mapRowToProperty(rs));
             }
         } catch (SQLException e) {
-            System.err.println("[PropertyDAO] getAllProperties failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve properties from the database.", e);
         }
         return list;
     }
@@ -113,7 +169,7 @@ public class PropertyDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[PropertyDAO] getPropertyById failed for ID " + propertyId + ": " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve property " + propertyId + " from the database.", e);
         }
         return null;
     }
@@ -142,8 +198,7 @@ public class PropertyDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[PropertyDAO] getPropertiesByLandlordId failed for landlord " + landlordId + ": "
-                    + e.getMessage());
+            throw new IllegalStateException("Could not retrieve properties for the landlord.", e);
         }
         return list;
     }
@@ -177,8 +232,7 @@ public class PropertyDAO {
             int affectedRows = pstmt.executeUpdate();
             return affectedRows > 0;
         } catch (SQLException e) {
-            System.err.println("[PropertyDAO] updateProperty failed: " + e.getMessage());
-            return false;
+            throw new IllegalStateException("Could not update the property in the database.", e);
         }
     }
 
@@ -207,8 +261,7 @@ public class PropertyDAO {
             int rowsDeleted = pstmt.executeUpdate();
             return rowsDeleted > 0;
         } catch (SQLException e) {
-            System.err.println("[PropertyDAO] deleteProperty failed for ID " + propertyId + ": " + e.getMessage());
-            return false;
+            throw new IllegalStateException("Could not delete the property from the database.", e);
         }
     }
 
@@ -228,7 +281,7 @@ public class PropertyDAO {
                 }
             }
         } catch (SQLException e) {
-            // If rooms table does not exist yet or query fails, allow proceed with caution
+            throw new IllegalStateException("Could not verify property dependencies.", e);
         }
         return false;
     }

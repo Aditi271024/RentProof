@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentProof - Rent Reminders &amp; Alerts</title>
+  <!-- Google Fonts: Bodoni Moda (Headings) & Poppins (UI / Body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="../shared/sidebar.css">
+  <link rel="stylesheet" href="reminders.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ==========================================
+         COLLAPSIBLE LEFT SIDEBAR (Midnight Blue)
+         ========================================== -->
+    <aside class="sidebar" id="appSidebar">
+      
+      <!-- Brand Logo / Header -->
+      <div class="sidebar-header">
+        <a href="../dashboard/dashboard.html" class="brand-link">
+          <div class="brand-logo-icon">RP</div>
+          <span class="brand-name">Rent<span>Proof</span></span>
+        </a>
+      </div>
+
+      <!-- Navigation Menu Items -->
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Portal</div>
+        
+        <!-- 1. Dashboard -->
+        <a href="../dashboard/dashboard.html" class="nav-item" data-tooltip="Dashboard">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <!-- 2. Properties -->
+        <a href="../properties/properties.html" class="nav-item" data-tooltip="Properties">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-label">Properties</span>
+        </a>
+
+        <div class="nav-section-title">Team Modules</div>
+
+        <!-- 3. Tenants -->
+        <a href="../tenants/tenants.html" class="nav-item" data-tooltip="Tenants">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Tenants</span>
+        </a>
+
+        <!-- 4. Rent & Payments -->
+        <a href="../payments/payments.html" class="nav-item" data-tooltip="Rent & Payments">
+          <span class="nav-icon">💳</span>
+          <span class="nav-label">Rent & Payments</span>
+        </a>
+
+        <!-- 5. Reminders -->
+        <a href="reminders.html" class="nav-item active" data-tooltip="Reminders">
+          <span class="nav-icon">🔔</span>
+          <span class="nav-label">Reminders</span>
+        </a>
+
+        <div class="nav-section-title">System</div>
+
+        <!-- 6. Reports -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports">
+          <span class="nav-icon">📈</span>
+          <span class="nav-label">Reports</span>
+        </a>
+
+        <!-- 7. Settings -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </a>
+      </nav>
+
+      <!-- 8. Sidebar Footer / Logout -->
+      <div class="sidebar-footer">
+        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Sign Out">
+          <span class="nav-icon">🚪</span>
+          <span class="logout-text">Sign Out</span>
+        </a>
+      </div>
+
+    </aside>
+
+    <!-- ==========================================
+         MAIN CONTENT AREA (Ivory Canvas)
+         ========================================== -->
+    <div class="main-wrapper">
+
+      <!-- TOP NAVBAR -->
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Navigation Sidebar">
+            ☰
+          </button>
+          
+          <div class="nav-search-bar">
+            <span class="nav-search-icon">🔍</span>
+            <input 
+              type="text" 
+              class="nav-search-input" 
+              id="reminderSearchInput" 
+              placeholder="Search reminders by title, tenant name, or notes..."
+            >
+          </div>
+        </div>
+
+        <div class="navbar-right">
+          <button class="notification-btn" id="reminderNotificationBtn" title="System Notifications">
+            🔔
+            <span class="notification-badge"></span>
+          </button>
+
+          <!-- Landlord Profile Pill -->
+          <div class="landlord-profile-pill">
+            <div class="profile-avatar" id="landlordAvatarInitials">AS</div>
+            <div class="profile-details">
+              <span class="profile-name" id="landlordDisplayName">Aditi Sharma</span>
+              <span class="profile-role">Landlord &bull; Active</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- PAGE CONTENT CANVAS -->
+      <main class="page-content">
+
+        <!-- Title & Action Header -->
+        <div class="page-header-bar">
+          <div class="page-title-block">
+            <h1>Rent Reminder Management</h1>
+            <p>Schedule rent due notices, track pending alerts, and manage property maintenance tasks.</p>
+          </div>
+          <div class="header-actions-group">
+            <a href="add-reminder.html" class="btn btn-primary btn-lg">
+              ➕ Create New Reminder
+            </a>
+          </div>
+        </div>
+
+        <!-- 5 Summary Stat Cards -->
+        <section class="stats-grid-5">
+          
+          <!-- Total Reminders -->
+          <div class="stat-card" data-filter-target="ALL" title="Click to view all reminders">
+            <div class="stat-icon">🔔</div>
+            <div class="stat-content">
+              <span class="stat-value" id="statTotalReminders">0</span>
+              <span class="stat-label">Total Reminders</span>
+            </div>
+          </div>
+
+          <!-- Pending Reminders -->
+          <div class="stat-card" data-filter-target="PENDING" title="Click to filter pending reminders">
+            <div class="stat-icon pending">⏳</div>
+            <div class="stat-content">
+              <span class="stat-value" id="statPendingReminders" style="color: #B45309;">0</span>
+              <span class="stat-label">Pending</span>
+            </div>
+          </div>
+
+          <!-- Upcoming Reminders -->
+          <div class="stat-card" data-filter-target="UPCOMING" title="Click to filter upcoming reminders">
+            <div class="stat-icon upcoming">🗓️</div>
+            <div class="stat-content">
+              <span class="stat-value" id="statUpcomingReminders" style="color: #1D4ED8;">0</span>
+              <span class="stat-label">Upcoming (7 Days)</span>
+            </div>
+          </div>
+
+          <!-- Overdue Reminders -->
+          <div class="stat-card" data-filter-target="OVERDUE" title="Click to filter overdue reminders">
+            <div class="stat-icon overdue">⚠️</div>
+            <div class="stat-content">
+              <span class="stat-value" id="statOverdueReminders" style="color: #B91C1C;">0</span>
+              <span class="stat-label">Overdue</span>
+            </div>
+          </div>
+
+          <!-- Completed Reminders -->
+          <div class="stat-card" data-filter-target="COMPLETED" title="Click to filter completed reminders">
+            <div class="stat-icon completed">✅</div>
+            <div class="stat-content">
+              <span class="stat-value" id="statCompletedReminders" style="color: #047857;">0</span>
+              <span class="stat-label">Completed</span>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- Filter & Search Toolbar -->
+        <section class="toolbar-card">
+          <div class="toolbar-left">
+            
+            <!-- Quick Filter Tabs -->
+            <div class="tab-pill-group">
+              <button class="tab-pill active" data-tab="ALL">
+                All <span class="pill-badge" id="badgeTabAll">0</span>
+              </button>
+              <button class="tab-pill" data-tab="PENDING">
+                Pending <span class="pill-badge" id="badgeTabPending">0</span>
+              </button>
+              <button class="tab-pill" data-tab="UPCOMING">
+                Upcoming <span class="pill-badge" id="badgeTabUpcoming">0</span>
+              </button>
+              <button class="tab-pill" data-tab="OVERDUE">
+                Overdue <span class="pill-badge" id="badgeTabOverdue">0</span>
+              </button>
+              <button class="tab-pill" data-tab="COMPLETED">
+                Completed <span class="pill-badge" id="badgeTabCompleted">0</span>
+              </button>
+              <button class="tab-pill" data-tab="MAINTENANCE">
+                Maintenance
+              </button>
+            </div>
+
+            <!-- Category Filter Dropdown -->
+            <select class="filter-select" id="reminderTypeFilter" title="Filter by Reminder Category">
+              <option value="ALL">All Categories</option>
+              <option value="Rent Due">Rent Due Notices</option>
+              <option value="Maintenance">Maintenance &amp; Repairs</option>
+              <option value="General">General Announcements</option>
+            </select>
+
+          </div>
+
+          <div class="toolbar-right">
+            <span style="font-size: 0.825rem; color: var(--slate-muted);">
+              Database: <strong>rentproof &bull; reminders</strong>
+            </span>
+          </div>
+        </section>
+
+        <!-- Reminders Table Card -->
+        <section class="reminders-table-card" id="remindersTableCard">
+          
+          <div class="table-header-bar">
+            <div class="table-header-title">
+              <span>📋 Reminder Schedule</span>
+              <span class="table-header-badge" id="tableCountIndicator">Showing all records</span>
+            </div>
+            <div>
+              <a href="add-reminder.html" class="btn btn-primary btn-sm">
+                ➕ Add Reminder
+              </a>
+            </div>
+          </div>
+
+          <div class="table-responsive">
+            <table class="reminders-table">
+              <thead>
+                <tr>
+                  <th style="width: 100px;">ID</th>
+                  <th style="width: 220px;">Recipient Tenant</th>
+                  <th>Reminder Title &amp; Message</th>
+                  <th style="width: 160px;">Due Date</th>
+                  <th style="width: 140px;">Type</th>
+                  <th style="width: 120px;">Status</th>
+                  <th style="width: 160px; text-align: center;">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="remindersTableBody">
+                <!-- Dynamically populated via reminders.js -->
+              </tbody>
+            </table>
+          </div>
+
+        </section>
+
+        <!-- Empty State (Shown when no reminders match filters) -->
+        <div class="empty-state-box" id="emptyStateBox" style="display: none;">
+          <div class="empty-state-icon">🔔</div>
+          <h3 class="empty-state-title">No Reminders Found</h3>
+          <p class="empty-state-desc">
+            No reminders matched the selected tab or search criteria. Create a new rent due notice or adjust your filters.
+          </p>
+          <a href="add-reminder.html" class="btn btn-primary">
+            ➕ Create New Reminder
+          </a>
+        </div>
+
+        <!-- Recent Activity Feed Card -->
+        <section class="activity-card">
+          <div class="activity-header">
+            <div class="activity-title">
+              <span>⏱️ Recent Reminder Activity</span>
+            </div>
+            <span style="font-size: 0.775rem; color: var(--slate-muted);">
+              Audit trail &bull; Gungun's Module
+            </span>
+          </div>
+          <div class="activity-timeline" id="activityFeedContainer">
+            <!-- Dynamically populated via reminders.js -->
+          </div>
+        </section>
+
+      </main>
+
+    </div>
+
+  </div>
+
+  <!-- ==========================================
+       MODAL 1: VIEW REMINDER DETAILS
+       ========================================== -->
+  <div class="modal-overlay" id="viewReminderModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Reminder Details</h3>
+        <button class="modal-close-btn" data-reminder-action="close-view">&times;</button>
+      </div>
+      <div class="modal-body" id="viewModalBody">
+        <!-- Injected via reminders.js -->
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-sm" data-reminder-action="close-view">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL 2: CONFIRM DELETE
+       ========================================== -->
+  <div class="modal-overlay" id="deleteConfirmModal">
+    <div class="modal-box" style="max-width: 440px;">
+      <div class="modal-header" style="background-color: var(--danger-bg); border-bottom-color: var(--danger-border);">
+        <h3 style="color: var(--danger);">Confirm Reminder Deletion</h3>
+        <button class="modal-close-btn" data-reminder-action="close-delete">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 12px; font-size: 0.95rem;">
+          Are you sure you want to delete <strong id="deleteReminderTitleTarget">this reminder</strong>?
+        </p>
+        <div style="font-size: 0.85rem; color: var(--danger); background-color: var(--danger-bg); padding: 10px; border-radius: 6px; border: 1px solid var(--danger-border);">
+          ⚠️ <strong>Permanent Action:</strong><br>
+          This will permanently remove the reminder record from the MySQL database.
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-sm" data-reminder-action="close-delete">Cancel</button>
+        <button class="btn btn-danger btn-sm" data-reminder-action="confirm-delete">Confirm Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================
+       MODAL 3: DISPATCH NOTICE SIMULATION
+       ========================================== -->
+  <div class="modal-overlay" id="sendNoticeModal">
+    <div class="modal-box">
+      <div class="modal-header" style="background-color: #EFF6FF; border-bottom-color: #BFDBFE;">
+        <h3 style="color: #1D4ED8;">Dispatch Notice to Tenant</h3>
+        <button class="modal-close-btn" data-reminder-action="close-notice">&times;</button>
+      </div>
+      <div class="modal-body" id="sendNoticeModalBody">
+        <!-- Injected via reminders.js -->
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-outline btn-sm" data-reminder-action="close-notice">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="confirmSendNoticeBtn">Send Notification</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../shared/security.js"></script>
+  <script src="reminders.js"></script>
+</body>
+</html>

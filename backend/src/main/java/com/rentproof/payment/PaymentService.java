@@ -76,7 +76,7 @@ public class PaymentService {
             return "Please select a valid room.";
         }
 
-        if (payment.getAmount() <= 0.0) {
+        if (!Double.isFinite(payment.getAmount()) || payment.getAmount() <= 0.0) {
             return "Payment amount must be greater than zero.";
         }
 
@@ -186,6 +186,15 @@ public class PaymentService {
         if (!isAllowedStatus(newStatus)) {
             throw new IllegalArgumentException("Invalid status: " + newStatus + ". Allowed: " + ALLOWED_STATUSES);
         }
+        Payment payment = paymentDAO.getPaymentById(paymentId);
+        if (payment == null) {
+            return false;
+        }
+        payment.setPaymentStatus(newStatus);
+        String validationError = validatePayment(payment);
+        if (validationError != null) {
+            throw new IllegalArgumentException(validationError);
+        }
         return paymentDAO.updatePaymentStatus(paymentId, newStatus);
     }
 
@@ -229,12 +238,13 @@ public class PaymentService {
      * - pendingPaymentCount (int)
      * - overduePaymentCount (int)
      */
-    public Map<String, Object> getDashboardStats() {
+    public Map<String, Object> getDashboardStats(int landlordId) {
         Map<String, Object> stats = new HashMap<>();
-        stats.put("totalRentCollected", paymentDAO.getTotalRentCollected());
-        stats.put("successfulPaymentCount", paymentDAO.getSuccessfulPaymentCount());
-        stats.put("pendingPaymentCount", paymentDAO.getPendingPaymentCount());
-        stats.put("overduePaymentCount", paymentDAO.getOverduePaymentCount());
+        stats.put("totalRentCollected", paymentDAO.getTotalRentCollected(landlordId));
+        stats.put("successfulPaymentCount", paymentDAO.getSuccessfulPaymentCount(landlordId));
+        stats.put("pendingPaymentCount", paymentDAO.getPendingPaymentCount(landlordId));
+        stats.put("overduePaymentCount", paymentDAO.getOverduePaymentCount(landlordId));
+        stats.put("overdueAmount", paymentDAO.getOverdueAmount(landlordId));
         return stats;
     }
 

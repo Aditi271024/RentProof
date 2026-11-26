@@ -104,7 +104,7 @@ public class PaymentDAO {
                 list.add(mapRowToPaymentWithDetails(rs));
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getAllPayments failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve payments from the database.", e);
         }
         return list;
     }
@@ -136,7 +136,7 @@ public class PaymentDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getPaymentById failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve payment " + paymentId + " from the database.", e);
         }
         return null;
     }
@@ -297,7 +297,7 @@ public class PaymentDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] searchAndFilterPayments failed: " + e.getMessage());
+            throw new IllegalStateException("Could not search payment records.", e);
         }
         return list;
     }
@@ -327,7 +327,7 @@ public class PaymentDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getRecentPayments failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve recent payments.", e);
         }
         return list;
     }
@@ -339,16 +339,18 @@ public class PaymentDAO {
     /**
      * Calculates total rent collected from all 'Paid' transactions.
      */
-    public double getTotalRentCollected() {
-        String sql = "SELECT SUM(amount) AS total FROM payments WHERE payment_status = 'Paid'";
+    public double getTotalRentCollected(int landlordId) {
+        String sql = "SELECT COALESCE(SUM(py.amount), 0) AS total FROM payments py "
+                + "JOIN properties pr ON pr.property_id = py.property_id "
+                + "WHERE py.payment_status = 'Paid' AND pr.landlord_id = ?";
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
-            if (rs.next()) {
-                return rs.getDouble("total");
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, landlordId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return rs.getDouble("total");
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getTotalRentCollected failed: " + e.getMessage());
+            throw new IllegalStateException("Could not calculate collected rent.", e);
         }
         return 0.0;
     }
@@ -356,36 +358,58 @@ public class PaymentDAO {
     /**
      * Returns count of successful payments (status = 'Paid').
      */
-    public int getSuccessfulPaymentCount() {
-        return getCountByStatus("Paid");
+    public int getSuccessfulPaymentCount(int landlordId) {
+        return getCountByStatus("Paid", landlordId);
     }
 
     /**
      * Returns count of pending payments (status = 'Pending').
      */
-    public int getPendingPaymentCount() {
-        return getCountByStatus("Pending");
+    public int getPendingPaymentCount(int landlordId) {
+        return getCountByStatus("Pending", landlordId);
     }
 
     /**
      * Returns count of overdue payments (status = 'Overdue').
      */
-    public int getOverduePaymentCount() {
-        return getCountByStatus("Overdue");
+    public int getOverduePaymentCount(int landlordId) {
+        return getCountByStatus("Overdue", landlordId);
     }
 
-    private int getCountByStatus(String status) {
-        String sql = "SELECT COUNT(*) AS total FROM payments WHERE payment_status = ?";
+    /**
+     * Calculates the total amount assigned to overdue payments.
+     */
+    public double getOverdueAmount(int landlordId) {
+        String sql = "SELECT COALESCE(SUM(py.amount), 0) AS total FROM payments py "
+                + "JOIN properties pr ON pr.property_id = py.property_id "
+                + "WHERE py.payment_status = 'Overdue' AND pr.landlord_id = ?";
+        try (Connection conn = DBConnection.getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+            pstmt.setInt(1, landlordId);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                if (rs.next()) return rs.getDouble("total");
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Could not calculate overdue rent.", e);
+        }
+        return 0.0;
+    }
+
+    private int getCountByStatus(String status, int landlordId) {
+        String sql = "SELECT COUNT(*) AS total FROM payments py "
+                + "JOIN properties pr ON pr.property_id = py.property_id "
+                + "WHERE py.payment_status = ? AND pr.landlord_id = ?";
         try (Connection conn = DBConnection.getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
             pstmt.setString(1, status);
+            pstmt.setInt(2, landlordId);
             try (ResultSet rs = pstmt.executeQuery()) {
                 if (rs.next()) {
                     return rs.getInt("total");
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getCountByStatus(" + status + ") failed: " + e.getMessage());
+            throw new IllegalStateException("Could not calculate payment counts.", e);
         }
         return 0;
     }
@@ -425,7 +449,7 @@ public class PaymentDAO {
                 tenants.add(map);
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getAvailableTenants failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve tenants for payment entry.", e);
         }
         return tenants;
     }
@@ -450,7 +474,7 @@ public class PaymentDAO {
                 properties.add(map);
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getAvailableProperties failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve properties for payment entry.", e);
         }
         return properties;
     }
@@ -479,7 +503,7 @@ public class PaymentDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[PaymentDAO] getRoomsByProperty failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve rooms for payment entry.", e);
         }
         return rooms;
     }
