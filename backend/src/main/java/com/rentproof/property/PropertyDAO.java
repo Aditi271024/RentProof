@@ -32,11 +32,11 @@ public class PropertyDAO {
      */
     public int addProperty(Property property) throws SQLException {
         String sql = "INSERT INTO properties (landlord_id, property_name, property_type, address, " +
-                     "city, state, pincode, total_rooms, monthly_rent, description) " +
-                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "city, state, pincode, total_rooms, monthly_rent, description) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             pstmt.setInt(1, property.getLandlordId());
             pstmt.setString(2, property.getPropertyName().trim());
@@ -67,19 +67,20 @@ public class PropertyDAO {
     }
 
     /**
-     * Retrieves all properties across the system (System Administrator / Debug view).
+     * Retrieves all properties across the system (System Administrator / Debug
+     * view).
      * 
      * @return ArrayList of Property objects
      */
     public ArrayList<Property> getAllProperties() {
         ArrayList<Property> list = new ArrayList<>();
         String sql = "SELECT property_id, landlord_id, property_name, property_type, address, " +
-                     "city, state, pincode, total_rooms, monthly_rent, description, created_at " +
-                     "FROM properties ORDER BY property_id DESC";
+                "city, state, pincode, total_rooms, monthly_rent, description, created_at " +
+                "FROM properties ORDER BY property_id DESC";
 
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql);
-             ResultSet rs = pstmt.executeQuery()) {
+                PreparedStatement pstmt = conn.prepareStatement(sql);
+                ResultSet rs = pstmt.executeQuery()) {
 
             while (rs.next()) {
                 list.add(mapRowToProperty(rs));
@@ -98,11 +99,11 @@ public class PropertyDAO {
      */
     public Property getPropertyById(int propertyId) {
         String sql = "SELECT property_id, landlord_id, property_name, property_type, address, " +
-                     "city, state, pincode, total_rooms, monthly_rent, description, created_at " +
-                     "FROM properties WHERE property_id = ?";
+                "city, state, pincode, total_rooms, monthly_rent, description, created_at " +
+                "FROM properties WHERE property_id = ?";
 
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setInt(1, propertyId);
 
@@ -127,11 +128,11 @@ public class PropertyDAO {
     public ArrayList<Property> getPropertiesByLandlordId(int landlordId) {
         ArrayList<Property> list = new ArrayList<>();
         String sql = "SELECT property_id, landlord_id, property_name, property_type, address, " +
-                     "city, state, pincode, total_rooms, monthly_rent, description, created_at " +
-                     "FROM properties WHERE landlord_id = ? ORDER BY property_id DESC";
+                "city, state, pincode, total_rooms, monthly_rent, description, created_at " +
+                "FROM properties WHERE landlord_id = ? ORDER BY property_id DESC";
 
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setInt(1, landlordId);
 
@@ -141,7 +142,8 @@ public class PropertyDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[PropertyDAO] getPropertiesByLandlordId failed for landlord " + landlordId + ": " + e.getMessage());
+            System.err.println("[PropertyDAO] getPropertiesByLandlordId failed for landlord " + landlordId + ": "
+                    + e.getMessage());
         }
         return list;
     }
@@ -154,11 +156,11 @@ public class PropertyDAO {
      */
     public boolean updateProperty(Property property) {
         String sql = "UPDATE properties SET property_name = ?, property_type = ?, address = ?, " +
-                     "city = ?, state = ?, pincode = ?, total_rooms = ?, monthly_rent = ?, description = ? " +
-                     "WHERE property_id = ? AND landlord_id = ?";
+                "city = ?, state = ?, pincode = ?, total_rooms = ?, monthly_rent = ?, description = ? " +
+                "WHERE property_id = ? AND landlord_id = ?";
 
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setString(1, property.getPropertyName().trim());
             pstmt.setString(2, property.getPropertyType().trim());
@@ -182,7 +184,8 @@ public class PropertyDAO {
 
     /**
      * Deletes a property record by ID.
-     * Enforces safety: prevents deletion if foreign keys (e.g. active rooms, tenants) are attached.
+     * Enforces safety: prevents deletion if foreign keys (e.g. active rooms,
+     * tenants) are attached.
      * 
      * @param propertyId property to delete
      * @return true if deleted, false if deletion blocked or record not found
@@ -190,15 +193,15 @@ public class PropertyDAO {
     public boolean deleteProperty(int propertyId) {
         // Safety verification: check for dependent rooms or tenants first
         if (hasActiveDependencies(propertyId)) {
-            System.err.println("[PropertyDAO] Cannot delete property ID " + propertyId + 
-                               ": Associated rooms or tenant records exist. Remove them first.");
+            System.err.println("[PropertyDAO] Cannot delete property ID " + propertyId +
+                    ": Associated rooms or tenant records exist. Remove them first.");
             return false;
         }
 
         String sql = "DELETE FROM properties WHERE property_id = ?";
 
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setInt(1, propertyId);
             int rowsDeleted = pstmt.executeUpdate();
@@ -210,12 +213,13 @@ public class PropertyDAO {
     }
 
     /**
-     * Checks if a property has associated rooms or tenants to protect data integrity.
+     * Checks if a property has associated rooms or tenants to protect data
+     * integrity.
      */
     public boolean hasActiveDependencies(int propertyId) {
         String checkRooms = "SELECT COUNT(*) FROM rooms WHERE property_id = ?";
         try (Connection conn = DBConnection.getConnection();
-             PreparedStatement pstmt = conn.prepareStatement(checkRooms)) {
+                PreparedStatement pstmt = conn.prepareStatement(checkRooms)) {
 
             pstmt.setInt(1, propertyId);
             try (ResultSet rs = pstmt.executeQuery()) {
