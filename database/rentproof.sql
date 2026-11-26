@@ -117,7 +117,6 @@ CREATE TABLE IF NOT EXISTS tenants (
     id_proof_number VARCHAR(50),
     move_in_date DATE NOT NULL,
     move_out_date DATE NULL,
-    monthly_rent DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     security_deposit DECIMAL(10, 2) DEFAULT 0.00,
     tenant_status VARCHAR(20) NOT NULL DEFAULT 'Active', -- 'Active', 'Moved Out', 'Pending'
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -389,8 +389,9 @@ const TenantAPI = {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Property assignment failed in backend.");
       }
+      const data = await res.json();
       await syncBackendData();
-      return await res.json();
+      return data.tenant || data;
     }
 
     const tenants = getStoredTenants();
@@ -1016,6 +1017,7 @@ function handleSaveNewTenant(form) {
     email,
     emergencyContact,
     permanentAddress,
+    idProofNumber: "",
     moveInDate,
     propertyId: Number(propertyId),
     roomId: Number(roomId),
@@ -1292,9 +1294,11 @@ function executePropertyAssignment() {
   const { tenantId, propertyId, roomId, monthlyRent, moveInDate } = pendingAssignmentData;
 
   TenantAPI.assignProperty(tenantId, propertyId, roomId, monthlyRent, moveInDate)
-    .then(updatedTenant => {
+    .then(result => {
       closeAllModals();
-      showToast(`Room assigned successfully to ${updatedTenant.fullName}!`, "success");
+      const tenant = getStoredTenants().find(t => t.tenantId === Number(tenantId));
+      const tenantName = (result && result.fullName) || (tenant && tenant.fullName) || "Tenant";
+      showToast(`Room assigned successfully to ${tenantName}!`, "success");
       setTimeout(() => {
         window.location.href = "tenants.html";
       }, 1300);

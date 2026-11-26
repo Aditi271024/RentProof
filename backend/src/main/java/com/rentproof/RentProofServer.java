@@ -880,7 +880,12 @@ public class RentProofServer {
                 if (data.containsKey("phone")) t.setPhone(data.get("phone").trim());
                 if (data.containsKey("emergencyContact")) t.setEmergencyContact(data.get("emergencyContact").trim());
                 if (data.containsKey("permanentAddress")) t.setPermanentAddress(data.get("permanentAddress").trim());
-                if (data.containsKey("idProofNumber")) t.setIdProofNumber(data.get("idProofNumber").trim());
+                if (data.containsKey("idProofNumber")) {
+                    String idVal = data.get("idProofNumber").trim();
+                    if (!idVal.startsWith("****")) {
+                        t.setIdProofNumber(idVal);
+                    }
+                }
                 if (data.containsKey("monthlyRent")) t.setMonthlyRent(parseDoubleSafe(data.get("monthlyRent"), t.getMonthlyRent()));
                 if (data.containsKey("securityDeposit")) t.setSecurityDeposit(parseDoubleSafe(data.get("securityDeposit"), t.getSecurityDeposit()));
                 if (data.containsKey("tenantStatus")) t.setTenantStatus(data.get("tenantStatus").trim());
@@ -984,7 +989,8 @@ public class RentProofServer {
 
                 boolean ok = tenantService.assignProperty(tenantId, propertyId, roomId, monthlyRent, moveInDate);
                 if (ok) {
-                    sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Property assigned successfully to tenant in MySQL\"}");
+                    Tenant updatedTenant = tenantService.getTenantById(tenantId);
+                    sendJsonResponse(exchange, 200, "{\"success\":true,\"message\":\"Property assigned successfully to tenant in MySQL\",\"tenant\":" + tenantToJson(updatedTenant) + "}");
                 } else {
                     sendJsonResponse(exchange, 409, "{\"success\":false,\"error\":\"The selected room is no longer available.\"}");
                 }
@@ -2002,7 +2008,7 @@ public class RentProofServer {
     }
 
     private static String tenantToJson(Tenant t) {
-        return String.format(
+        return String.format(java.util.Locale.US,
                 "{\"tenantId\":%d,\"propertyId\":%d,\"propertyName\":\"%s\",\"roomId\":%d,\"roomNumber\":\"%s\"," +
                 "\"fullName\":\"%s\",\"email\":\"%s\",\"phone\":\"%s\",\"emergencyContact\":\"%s\"," +
                 "\"permanentAddress\":\"%s\",\"idProofNumber\":\"%s\",\"moveInDate\":\"%s\",\"moveOutDate\":\"%s\"," +
