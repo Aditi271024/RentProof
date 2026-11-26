@@ -13,7 +13,7 @@
             "cwd": "${workspaceFolder}",
             "vmArgs": "",
             "env": {
-                "JAVA_HOME": "/Library/Java/JavaVirtualMachines/jdk-27.jdk/Contents/Home"
+                "JAVA_HOME": "/Library/Java/JavaVirtualMachines/jdk-25.jdk/Contents/Home"
             }
         }
     ]

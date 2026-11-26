@@ -26,7 +26,7 @@ The **Rent Reminder Management Module** is an integral component of the **RentPr
 | Layer | Technology | Justification |
 | :--- | :--- | :--- |
 | **Frontend** | HTML5, CSS3, Vanilla JavaScript | Zero third-party frontend frameworks (No React, Vue, or Angular). Lightweight, fast, and easy to explain. |
-| **Backend** | Core Java (JDK 17/21) | Object-Oriented Programming (OOP) adhering strictly to standard college syllabus. |
+| **Backend** | Core Java (JDK 25) | Object-Oriented Programming (OOP) adhering strictly to standard college syllabus. |
 | **Database** | MySQL (InnoDB Engine) | Shared `rentproof` database enforcing ACID compliance and foreign key integrity. |
 | **Connectivity** | Java Database Connectivity (JDBC) | PreparedStatement queries preventing SQL Injection; try-with-resources for leak-free connection management. |
 | **IDE** | VS Code / IntelliJ / Eclipse | Standard project setup with Maven `pom.xml` and terminal scripts (`compile-and-run.sh` / `.bat`). |

@@ -193,7 +193,7 @@ The design adheres strictly to **Third Normal Form (3NF)**:
 
 ## 8. Verification & Integration Checklist
 
-- [x] Java classes compile cleanly with zero errors (`javac` using JDK 17/21).
+- [x] Java classes compile cleanly with zero errors (`javac --release 25`).
 - [x] All 10 required files created and named exactly as specified.
 - [x] Strict adherence to Lecture 1–42 syllabus (no lambdas, no streams, simple OOP loops).
 - [x] Midnight Blue & Ivory color scheme applied throughout all views.
