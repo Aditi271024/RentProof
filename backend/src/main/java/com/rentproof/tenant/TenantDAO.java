@@ -36,8 +36,7 @@ public class TenantDAO {
      * @throws SQLException on database error
      */
     public int addTenant(Tenant tenant) throws SQLException {
-        String insertSql = "INSERT INTO tenants (property_id, room_id, full_name, email, phone, " +
-                           "emergency_contact, permanent_address, id_proof_number, move_in_date, monthly_rent, security_deposit, tenant_status) " +
+        String insertSql = "INSERT INTO tenants (property_id, room_id, full_name, email, phone, emergency_contact, permanent_address, id_proof_number, move_in_date, monthly_rent, security_deposit, tenant_status)"+
                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         String updateRoomSql = "UPDATE rooms SET room_status = 'Occupied' "
