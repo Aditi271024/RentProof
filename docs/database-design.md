@@ -73,7 +73,9 @@ erDiagram
         varchar full_name
         varchar email
         varchar phone
+        varchar permanent_address
         date move_in_date
+        decimal monthly_rent
         decimal security_deposit
         varchar tenant_status
         timestamp created_at

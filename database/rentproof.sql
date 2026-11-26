@@ -120,6 +120,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     full_name VARCHAR(100) NOT NULL,
     email VARCHAR(100) NOT NULL,
     phone VARCHAR(20) NOT NULL,
+    permanent_address VARCHAR(255),
     emergency_contact VARCHAR(20),
     id_proof_number VARCHAR(50),
     move_in_date DATE NOT NULL,

@@ -37,8 +37,8 @@ public class TenantDAO {
      */
     public int addTenant(Tenant tenant) throws SQLException {
         String insertSql = "INSERT INTO tenants (property_id, room_id, full_name, email, phone, " +
-                "emergency_contact, id_proof_number, move_in_date, monthly_rent, security_deposit, tenant_status) " +
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "permanent_address, emergency_contact, id_proof_number, move_in_date, monthly_rent, " +
+                "security_deposit, tenant_status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         String updateRoomSql = "UPDATE rooms SET room_status = 'Occupied' WHERE room_id = ?";
 
@@ -57,15 +57,13 @@ public class TenantDAO {
             pstmt.setString(3, tenant.getFullName().trim());
             pstmt.setString(4, tenant.getEmail().trim());
             pstmt.setString(5, tenant.getPhone().trim());
-            pstmt.setString(6, tenant.getEmergencyContact() != null ? tenant.getEmergencyContact().trim() : null);
-            // Map permanentAddress into id_proof_number / address metadata
-            String idOrAddress = tenant.getPermanentAddress() != null ? tenant.getPermanentAddress().trim()
-                    : tenant.getIdProofNumber();
-            pstmt.setString(7, idOrAddress);
-            pstmt.setDate(8, tenant.getMoveInDate());
-            pstmt.setDouble(9, tenant.getMonthlyRent());
-            pstmt.setDouble(10, tenant.getSecurityDeposit());
-            pstmt.setString(11, tenant.getTenantStatus() != null ? tenant.getTenantStatus() : "Active");
+            pstmt.setString(6, tenant.getPermanentAddress() != null ? tenant.getPermanentAddress().trim() : null);
+            pstmt.setString(7, tenant.getEmergencyContact() != null ? tenant.getEmergencyContact().trim() : null);
+            pstmt.setString(8, tenant.getIdProofNumber() != null ? tenant.getIdProofNumber().trim() : null);
+            pstmt.setDate(9, tenant.getMoveInDate());
+            pstmt.setDouble(10, tenant.getMonthlyRent());
+            pstmt.setDouble(11, tenant.getSecurityDeposit());
+            pstmt.setString(12, tenant.getTenantStatus() != null ? tenant.getTenantStatus() : "Active");
 
             int affectedRows = pstmt.executeUpdate();
             int generatedId = -1;
@@ -134,9 +132,10 @@ public class TenantDAO {
     public ArrayList<Tenant> getAllTenants() {
         ArrayList<Tenant> list = new ArrayList<>();
         String sql = "SELECT t.tenant_id, t.property_id, t.room_id, t.full_name, t.email, t.phone, " +
-                "t.emergency_contact, t.id_proof_number, t.move_in_date, t.move_out_date, " +
+                "t.emergency_contact, t.permanent_address, t.id_proof_number, t.move_in_date, t.move_out_date, " +
                 "t.security_deposit, t.tenant_status, t.created_at, " +
-                "p.property_name, r.room_number, COALESCE(t.monthly_rent, r.monthly_rent) AS monthly_rent " +
+                "p.property_name, r.room_number, COALESCE(NULLIF(t.monthly_rent, 0), " +
+                "NULLIF(r.monthly_rent, 0), p.monthly_rent) AS monthly_rent " +
                 "FROM tenants t " +
                 "LEFT JOIN properties p ON t.property_id = p.property_id " +
                 "LEFT JOIN rooms r ON t.room_id = r.room_id " +
@@ -163,9 +162,10 @@ public class TenantDAO {
      */
     public Tenant getTenantById(int tenantId) {
         String sql = "SELECT t.tenant_id, t.property_id, t.room_id, t.full_name, t.email, t.phone, " +
-                "t.emergency_contact, t.id_proof_number, t.move_in_date, t.move_out_date, " +
+                "t.emergency_contact, t.permanent_address, t.id_proof_number, t.move_in_date, t.move_out_date, " +
                 "t.security_deposit, t.tenant_status, t.created_at, " +
-                "p.property_name, r.room_number, COALESCE(t.monthly_rent, r.monthly_rent) AS monthly_rent " +
+                "p.property_name, r.room_number, COALESCE(NULLIF(t.monthly_rent, 0), " +
+                "NULLIF(r.monthly_rent, 0), p.monthly_rent) AS monthly_rent " +
                 "FROM tenants t " +
                 "LEFT JOIN properties p ON t.property_id = p.property_id " +
                 "LEFT JOIN rooms r ON t.room_id = r.room_id " +
@@ -196,7 +196,8 @@ public class TenantDAO {
      */
     public boolean updateTenant(Tenant tenant) {
         String updateSql = "UPDATE tenants SET full_name = ?, email = ?, phone = ?, " +
-                "emergency_contact = ?, id_proof_number = ?, monthly_rent = ?, tenant_status = ?, move_out_date = ? " +
+                "emergency_contact = ?, permanent_address = ?, id_proof_number = ?, monthly_rent = ?, " +
+                "tenant_status = ?, move_out_date = ? " +
                 "WHERE tenant_id = ?";
 
         String roomStatusSql = "UPDATE rooms SET room_status = ? WHERE room_id = ?";
@@ -214,13 +215,12 @@ public class TenantDAO {
             pstmt.setString(2, tenant.getEmail().trim());
             pstmt.setString(3, tenant.getPhone().trim());
             pstmt.setString(4, tenant.getEmergencyContact() != null ? tenant.getEmergencyContact().trim() : null);
-            String idOrAddress = tenant.getPermanentAddress() != null ? tenant.getPermanentAddress().trim()
-                    : tenant.getIdProofNumber();
-            pstmt.setString(5, idOrAddress);
-            pstmt.setDouble(6, tenant.getMonthlyRent());
-            pstmt.setString(7, tenant.getTenantStatus());
-            pstmt.setDate(8, tenant.getMoveOutDate());
-            pstmt.setInt(9, tenant.getTenantId());
+            pstmt.setString(5, tenant.getPermanentAddress() != null ? tenant.getPermanentAddress().trim() : null);
+            pstmt.setString(6, tenant.getIdProofNumber() != null ? tenant.getIdProofNumber().trim() : null);
+            pstmt.setDouble(7, tenant.getMonthlyRent());
+            pstmt.setString(8, tenant.getTenantStatus());
+            pstmt.setDate(9, tenant.getMoveOutDate());
+            pstmt.setInt(10, tenant.getTenantId());
 
             int affected = pstmt.executeUpdate();
 
@@ -447,9 +447,10 @@ public class TenantDAO {
     public ArrayList<Tenant> getTenantsByProperty(int propertyId) {
         ArrayList<Tenant> list = new ArrayList<>();
         String sql = "SELECT t.tenant_id, t.property_id, t.room_id, t.full_name, t.email, t.phone, " +
-                "t.emergency_contact, t.id_proof_number, t.move_in_date, t.move_out_date, " +
+                "t.emergency_contact, t.permanent_address, t.id_proof_number, t.move_in_date, t.move_out_date, " +
                 "t.security_deposit, t.tenant_status, t.created_at, " +
-                "p.property_name, r.room_number, COALESCE(t.monthly_rent, r.monthly_rent) AS monthly_rent " +
+                "p.property_name, r.room_number, COALESCE(NULLIF(t.monthly_rent, 0), " +
+                "NULLIF(r.monthly_rent, 0), p.monthly_rent) AS monthly_rent " +
                 "FROM tenants t " +
                 "LEFT JOIN properties p ON t.property_id = p.property_id " +
                 "LEFT JOIN rooms r ON t.room_id = r.room_id " +
@@ -510,7 +511,7 @@ public class TenantDAO {
         tenant.setPhone(rs.getString("phone"));
         tenant.setEmergencyContact(rs.getString("emergency_contact"));
         tenant.setIdProofNumber(rs.getString("id_proof_number"));
-        tenant.setPermanentAddress(rs.getString("id_proof_number"));
+        tenant.setPermanentAddress(rs.getString("permanent_address"));
         tenant.setMoveInDate(rs.getDate("move_in_date"));
         tenant.setMoveOutDate(rs.getDate("move_out_date"));
         tenant.setSecurityDeposit(rs.getDouble("security_deposit"));
