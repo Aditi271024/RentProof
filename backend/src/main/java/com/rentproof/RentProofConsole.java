@@ -380,8 +380,8 @@ public class RentProofConsole {
     private static void updateProperty() throws SQLException {
         Landlord landlord = requireLogin();
         int propertyId = readPositiveInt("Property ID: ");
-        Property existing = PROPERTY_SERVICE.getProperty(propertyId, landlord.getLandlordId());
-        if (existing == null) {
+        Property existing = PROPERTY_SERVICE.getPropertyById(propertyId);
+        if (existing == null || existing.getLandlordId() != landlord.getLandlordId()) {
             System.out.println("Property not found for this landlord.");
             return;
         }
