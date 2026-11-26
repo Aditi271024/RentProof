@@ -6,13 +6,15 @@
             "name": "RentProofServer",
             "request": "launch",
             "mainClass": "com.rentproof.RentProofServer",
-            "projectName": "rentproof-core",
             "classPaths": [
-                "${workspaceFolder}\\bin",
-                "${workspaceFolder}\\backend\\src\\main\\resources",
-                "${workspaceFolder}\\lib\\mysql-connector-j-8.3.0.jar"
+                "${workspaceFolder}/bin",
+                "${workspaceFolder}/lib/mysql-connector-j-8.3.0.jar"
             ],
-            "cwd": "${workspaceFolder}"
+            "cwd": "${workspaceFolder}",
+            "vmArgs": "",
+            "env": {
+                "JAVA_HOME": "/Library/Java/JavaVirtualMachines/jdk-27.jdk/Contents/Home"
+            }
         }
     ]
 }
