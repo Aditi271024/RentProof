@@ -5,7 +5,7 @@ echo ============================================================
 
 if not exist bin mkdir bin
 
-javac -d bin -cp ".;lib/*;backend/src/main/resources" backend/src/main/java/com/rentproof/database/*.java backend/src/main/java/com/rentproof/landlord/*.java backend/src/main/java/com/rentproof/property/*.java backend/src/main/java/com/rentproof/dashboard/*.java
+javac --release 25 -d bin -cp ".;lib/*;backend/src/main/resources" backend/src/main/java/com/rentproof/database/*.java backend/src/main/java/com/rentproof/landlord/*.java backend/src/main/java/com/rentproof/property/*.java backend/src/main/java/com/rentproof/dashboard/*.java
 
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Compilation failed.

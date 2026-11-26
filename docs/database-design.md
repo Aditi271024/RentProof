@@ -254,7 +254,7 @@ For examination and viva questions, this schema follows third normal form (3NF):
 From the project root on Windows, compile and run the initializer:
 
 ```bat
-javac -d bin -cp "lib/*;backend\\src\\main\\resources" backend\\src\\main\\java\\com\\rentproof\\database\\DBConnection.java backend\\src\\main\\java\\com\\rentproof\\database\\DatabaseInitializer.java
+javac --release 25 -d bin -cp "lib/*;backend\\src\\main\\resources" backend\\src\\main\\java\\com\\rentproof\\database\\DBConnection.java backend\\src\\main\\java\\com\\rentproof\\database\\DatabaseInitializer.java
 java -cp "bin;lib/*;backend\\src\\main\\resources" com.rentproof.database.DatabaseInitializer
 ```
 

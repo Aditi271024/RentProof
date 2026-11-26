@@ -11,9 +11,9 @@ mkdir -p bin
 JAVAC_CMD="javac"
 JAVA_CMD="java"
 
-if [ -x "/Library/Java/JavaVirtualMachines/jdk-25.jdk/Contents/Home/bin/javac" ]; then
-    JAVAC_CMD="/Library/Java/JavaVirtualMachines/jdk-25.jdk/Contents/Home/bin/javac"
-    JAVA_CMD="/Library/Java/JavaVirtualMachines/jdk-25.jdk/Contents/Home/bin/java"
+if [ -x "$HOME/Library/Java/JavaVirtualMachines/jdk-25.0.5.1+2/Contents/Home/bin/javac" ]; then
+    JAVAC_CMD="$HOME/Library/Java/JavaVirtualMachines/jdk-25.0.5.1+2/Contents/Home/bin/javac"
+    JAVA_CMD="$HOME/Library/Java/JavaVirtualMachines/jdk-25.0.5.1+2/Contents/Home/bin/java"
 elif [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/javac" ]; then
     JAVAC_CMD="$JAVA_HOME/bin/javac"
     JAVA_CMD="$JAVA_HOME/bin/java"

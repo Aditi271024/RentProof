@@ -11,10 +11,7 @@
                 "${workspaceFolder}/lib/mysql-connector-j-8.3.0.jar"
             ],
             "cwd": "${workspaceFolder}",
-            "vmArgs": "",
-            "env": {
-                "JAVA_HOME": "/Library/Java/JavaVirtualMachines/jdk-25.jdk/Contents/Home"
-            }
+            "javaExec": "/Library/Java/JavaVirtualMachines/jdk-27.jdk/Contents/Home/bin/java"
         }
     ]
 }
