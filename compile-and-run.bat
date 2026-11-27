@@ -10,7 +10,7 @@ if exist sources.txt del sources.txt
 
 for /r backend\src\main\java %%F in (*.java) do echo "%%F" >> sources.txt
 
-javac --release 25 -d bin -cp ".;lib/*;backend/src/main/resources" @sources.txt
+javac --release 17 -d bin -cp ".;lib/*;backend/src/main/resources" @sources.txt
 
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Compilation failed.

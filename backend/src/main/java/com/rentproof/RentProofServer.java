@@ -7,6 +7,7 @@ import com.rentproof.dashboard.PropertyOverviewDTO;
 import com.rentproof.dashboard.ReminderDTO;
 import com.rentproof.database.DBConnection;
 import com.rentproof.database.DatabaseInitializer;
+import com.rentproof.database.DatabaseSeeder;
 import com.rentproof.auth.SessionManager;
 import com.rentproof.landlord.AuthService;
 import com.rentproof.landlord.Landlord;
@@ -85,6 +86,7 @@ public class RentProofServer {
     public static void main(String[] args) throws IOException {
         try {
             DatabaseInitializer.initializeDatabase();
+            DatabaseSeeder.seedIfEmpty();
         } catch (SQLException e) {
             throw new IOException("Failed to initialize the RentProof database.", e);
         }
@@ -541,7 +543,19 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
-            if (!requireMethod(exchange, "GET")) return;
+            if (!requireMethod(exchange, "GET", "POST", "PUT", "DELETE")) return;
+
+            String method = exchange.getRequestMethod();
+            if ("POST".equalsIgnoreCase(method)) {
+                new AddRoomHandler().handle(exchange);
+                return;
+            } else if ("PUT".equalsIgnoreCase(method)) {
+                new UpdateRoomHandler().handle(exchange);
+                return;
+            } else if ("DELETE".equalsIgnoreCase(method)) {
+                new DeleteRoomHandler().handle(exchange);
+                return;
+            }
 
             try {
                 String query = exchange.getRequestURI().getQuery();
@@ -633,7 +647,7 @@ public class RentProofServer {
             addCorsHeaders(exchange);
             if (handleOptions(exchange)) return;
             if (!requireAuthentication(exchange)) return;
-            if (!requireMethod(exchange, "POST")) return;
+            if (!requireMethod(exchange, "POST", "PUT")) return;
 
             try {
                 String body = readRequestBody(exchange);

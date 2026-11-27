@@ -186,28 +186,46 @@ public class AuthService {
             return null;
         }
 
-        boolean matches;
-        if (landlord.getPasswordSalt() == null || landlord.getPasswordSalt().trim().isEmpty()) {
-            matches = MessageDigest.isEqual(
-                    hashLegacySha256(plainPassword).getBytes(StandardCharsets.US_ASCII),
-                    landlord.getPasswordHash().getBytes(StandardCharsets.US_ASCII));
-            if (matches) {
+        boolean matches = verifyPassword(plainPassword, landlord.getPasswordHash(),
+                landlord.getPasswordSalt(), landlord.getPasswordIterations());
+
+        if (matches) {
+            // Transparently upgrade legacy SHA-256 hash to salted PBKDF2 upon successful login
+            if (landlord.getPasswordSalt() == null || landlord.getPasswordSalt().trim().isEmpty()) {
                 String salt = generateSalt();
                 String hash = hashPassword(plainPassword, salt, PBKDF2_ITERATIONS);
                 landlordDAO.updatePasswordHash(landlord.getLandlordId(), hash, salt, PBKDF2_ITERATIONS);
             }
-        } else {
-            String inputHash = hashPassword(plainPassword, landlord.getPasswordSalt(),
-                    landlord.getPasswordIterations() > 0
-                            ? landlord.getPasswordIterations()
-                            : PBKDF2_ITERATIONS);
-            matches = constantTimeHexEquals(inputHash, landlord.getPasswordHash());
-        }
-
-        if (matches) {
             return landlord;
         } else {
             return null;
+        }
+    }
+
+    /**
+     * Verifies a plaintext password against a stored hash and salt.
+     * Supports both modern salted PBKDF2 hashes and legacy SHA-256 hashes.
+     * 
+     * @param plainPassword plaintext candidate password
+     * @param storedHash stored password hash
+     * @param saltBase64 stored Base64 salt (null or empty for legacy SHA-256)
+     * @param iterations PBKDF2 iteration count (or 0 for default)
+     * @return true if credentials match, false otherwise
+     */
+    public static boolean verifyPassword(String plainPassword, String storedHash, String saltBase64, int iterations) {
+        if (plainPassword == null || storedHash == null) {
+            return false;
+        }
+        if (saltBase64 == null || saltBase64.trim().isEmpty()) {
+            String legacy = hashLegacySha256(plainPassword);
+            return constantTimeHexEquals(legacy, storedHash);
+        }
+        int iter = iterations > 0 ? iterations : PBKDF2_ITERATIONS;
+        try {
+            String computedHash = hashPassword(plainPassword, saltBase64, iter);
+            return constantTimeHexEquals(computedHash, storedHash);
+        } catch (Exception e) {
+            return false;
         }
     }
 

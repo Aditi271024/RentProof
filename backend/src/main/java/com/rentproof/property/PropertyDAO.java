@@ -244,40 +244,134 @@ public class PropertyDAO {
      * @param propertyId property to delete
      * @return true if deleted, false if deletion blocked or record not found
      */
+    /**
+     * Deletes a property record by ID within a database transaction.
+     * Enforces safety: prevents deletion if active tenants, payments, or occupied rooms exist.
+     * If the property only has unused vacant rooms, those rooms are safely deleted
+     * along with the property inside the same transaction.
+     * 
+     * @param propertyId property to delete
+     * @return true if deleted, false if deletion blocked or record not found
+     */
     public boolean deleteProperty(int propertyId) {
-        // Safety verification: check for dependent rooms or tenants first
-        if (hasActiveDependencies(propertyId)) {
-            System.err.println("[PropertyDAO] Cannot delete property ID " + propertyId +
-                    ": Associated rooms or tenant records exist. Remove them first.");
-            return false;
-        }
+        String checkOccupiedRooms = "SELECT COUNT(*) FROM rooms WHERE property_id = ? AND LOWER(room_status) != 'vacant'";
+        String checkTenants = "SELECT COUNT(*) FROM tenants WHERE property_id = ?";
+        String checkPayments = "SELECT COUNT(*) FROM payments WHERE property_id = ?";
+        String deleteVacantRooms = "DELETE FROM rooms WHERE property_id = ? AND LOWER(room_status) = 'vacant'";
+        String deletePropertySql = "DELETE FROM properties WHERE property_id = ?";
 
-        String sql = "DELETE FROM properties WHERE property_id = ?";
+        try (Connection conn = DBConnection.getConnection()) {
+            boolean originalAutoCommit = conn.getAutoCommit();
+            conn.setAutoCommit(false);
+            try {
+                // 1. Guard check: Occupied or non-vacant rooms
+                try (PreparedStatement pstmt = conn.prepareStatement(checkOccupiedRooms)) {
+                    pstmt.setInt(1, propertyId);
+                    try (ResultSet rs = pstmt.executeQuery()) {
+                        if (rs.next() && rs.getInt(1) > 0) {
+                            System.err.println("[PropertyDAO] Cannot delete property ID " + propertyId +
+                                    ": Occupied rooms exist. Remove or reassign tenants first.");
+                            conn.rollback();
+                            return false;
+                        }
+                    }
+                }
 
-        try (Connection conn = DBConnection.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(sql)) {
+                // 2. Guard check: Associated tenants
+                try (PreparedStatement pstmt = conn.prepareStatement(checkTenants)) {
+                    pstmt.setInt(1, propertyId);
+                    try (ResultSet rs = pstmt.executeQuery()) {
+                        if (rs.next() && rs.getInt(1) > 0) {
+                            System.err.println("[PropertyDAO] Cannot delete property ID " + propertyId +
+                                    ": Associated tenant records exist.");
+                            conn.rollback();
+                            return false;
+                        }
+                    }
+                }
 
-            pstmt.setInt(1, propertyId);
-            int rowsDeleted = pstmt.executeUpdate();
-            return rowsDeleted > 0;
+                // 3. Guard check: Associated payments
+                try (PreparedStatement pstmt = conn.prepareStatement(checkPayments)) {
+                    pstmt.setInt(1, propertyId);
+                    try (ResultSet rs = pstmt.executeQuery()) {
+                        if (rs.next() && rs.getInt(1) > 0) {
+                            System.err.println("[PropertyDAO] Cannot delete property ID " + propertyId +
+                                    ": Associated payment records exist.");
+                            conn.rollback();
+                            return false;
+                        }
+                    }
+                }
+
+                // 4. Safe cascade: delete unused vacant rooms for this property
+                try (PreparedStatement pstmt = conn.prepareStatement(deleteVacantRooms)) {
+                    pstmt.setInt(1, propertyId);
+                    pstmt.executeUpdate();
+                }
+
+                // 5. Delete the property record
+                int rowsDeleted;
+                try (PreparedStatement pstmt = conn.prepareStatement(deletePropertySql)) {
+                    pstmt.setInt(1, propertyId);
+                    rowsDeleted = pstmt.executeUpdate();
+                }
+
+                if (rowsDeleted > 0) {
+                    conn.commit();
+                    return true;
+                } else {
+                    conn.rollback();
+                    return false;
+                }
+            } catch (SQLException e) {
+                try {
+                    conn.rollback();
+                } catch (SQLException rollbackEx) {
+                    System.err.println("[PropertyDAO] Rollback failed: " + rollbackEx.getMessage());
+                }
+                throw new IllegalStateException("Could not delete property ID " + propertyId + " from the database.", e);
+            } finally {
+                try {
+                    conn.setAutoCommit(originalAutoCommit);
+                } catch (SQLException ignored) {}
+            }
         } catch (SQLException e) {
-            throw new IllegalStateException("Could not delete the property from the database.", e);
+            throw new IllegalStateException("Database connection failed during property deletion.", e);
         }
     }
 
     /**
-     * Checks if a property has associated rooms or tenants to protect data
-     * integrity.
+     * Checks if a property has associated active dependencies (tenants, payments, or occupied rooms)
+     * that strictly forbid deletion.
      */
     public boolean hasActiveDependencies(int propertyId) {
-        String checkRooms = "SELECT COUNT(*) FROM rooms WHERE property_id = ?";
-        try (Connection conn = DBConnection.getConnection();
-                PreparedStatement pstmt = conn.prepareStatement(checkRooms)) {
+        String checkOccupiedRooms = "SELECT COUNT(*) FROM rooms WHERE property_id = ? AND LOWER(room_status) != 'vacant'";
+        String checkTenants = "SELECT COUNT(*) FROM tenants WHERE property_id = ?";
+        String checkPayments = "SELECT COUNT(*) FROM payments WHERE property_id = ?";
 
-            pstmt.setInt(1, propertyId);
-            try (ResultSet rs = pstmt.executeQuery()) {
-                if (rs.next() && rs.getInt(1) > 0) {
-                    return true;
+        try (Connection conn = DBConnection.getConnection()) {
+            try (PreparedStatement pstmt = conn.prepareStatement(checkOccupiedRooms)) {
+                pstmt.setInt(1, propertyId);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next() && rs.getInt(1) > 0) {
+                        return true;
+                    }
+                }
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(checkTenants)) {
+                pstmt.setInt(1, propertyId);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next() && rs.getInt(1) > 0) {
+                        return true;
+                    }
+                }
+            }
+            try (PreparedStatement pstmt = conn.prepareStatement(checkPayments)) {
+                pstmt.setInt(1, propertyId);
+                try (ResultSet rs = pstmt.executeQuery()) {
+                    if (rs.next() && rs.getInt(1) > 0) {
+                        return true;
+                    }
                 }
             }
         } catch (SQLException e) {

@@ -11,10 +11,7 @@ mkdir -p bin
 JAVAC_CMD="javac"
 JAVA_CMD="java"
 
-if [ -x "/Library/Java/JavaVirtualMachines/jdk-25.jdk/Contents/Home/bin/javac" ]; then
-    JAVAC_CMD="/Library/Java/JavaVirtualMachines/jdk-25.jdk/Contents/Home/bin/javac"
-    JAVA_CMD="/Library/Java/JavaVirtualMachines/jdk-25.jdk/Contents/Home/bin/java"
-elif [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/javac" ]; then
+if [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/javac" ]; then
     JAVAC_CMD="$JAVA_HOME/bin/javac"
     JAVA_CMD="$JAVA_HOME/bin/java"
 fi
@@ -23,7 +20,7 @@ echo "============================================================"
 echo "  Compiling RentProof Core Java & JDBC Backend"
 echo "============================================================"
 
-$JAVAC_CMD --release 25 -d bin -cp ".:lib/*:backend/src/main/resources" \
+$JAVAC_CMD --release 17 -d bin -cp ".:lib/*:backend/src/main/resources" \
     backend/src/main/java/com/rentproof/database/*.java \
     backend/src/main/java/com/rentproof/landlord/*.java \
     backend/src/main/java/com/rentproof/property/*.java \

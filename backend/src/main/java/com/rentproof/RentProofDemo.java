@@ -27,14 +27,19 @@ public class RentProofDemo {
         System.out.println("   RENTPROOF: ADITI'S MODULE BACKEND VERIFICATION SUITE     ");
         System.out.println("============================================================\n");
 
-        // 1. Password Hashing Verification
-        System.out.println("--- 1. TESTING PASSWORD HASHING (SHA-256) ---");
+        // 1. Password Hashing & Verification Test
+        System.out.println("--- 1. TESTING PASSWORD HASHING & PBKDF2 VERIFICATION ---");
         String testPassword = "RentProof@123";
-        String testHash = AuthService.hashPassword(testPassword);
+        String salt = AuthService.generateSalt();
+        String testHash = AuthService.hashPassword(testPassword, salt, AuthService.PBKDF2_ITERATIONS);
         System.out.println("Plaintext Password : " + testPassword);
-        System.out.println("Generated SHA-256  : " + testHash);
-        System.out.println("Hash Length (chars): " + testHash.length() + " (Fixed 256-bit hash)");
-        System.out.println("Is Consistent      : " + testHash.equals(AuthService.hashPassword(testPassword)));
+        System.out.println("Generated Salt     : " + salt);
+        System.out.println("Generated PBKDF2   : " + testHash);
+        System.out.println("Hash Length (chars): " + testHash.length() + " (Base64 encoded 256-bit hash)");
+        boolean matchesValid = AuthService.verifyPassword(testPassword, testHash, salt, AuthService.PBKDF2_ITERATIONS);
+        boolean matchesInvalid = AuthService.verifyPassword("WrongPassword@456", testHash, salt, AuthService.PBKDF2_ITERATIONS);
+        System.out.println("Valid Password Verified   : " + matchesValid);
+        System.out.println("Invalid Password Rejected : " + (!matchesInvalid));
         System.out.println();
 
         // 2. Validation Logic Tests
