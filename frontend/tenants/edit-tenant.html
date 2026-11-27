@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentProof - Edit Tenant Profile</title>
+  <!-- Google Fonts: Bodoni Moda (Headings) & Poppins (UI / Body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
+  <!-- Shared Design System CSS -->
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="../shared/sidebar.css">
+  <!-- Shweta's Module CSS -->
+  <link rel="stylesheet" href="tenants.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ==========================================
+         COLLAPSIBLE LEFT SIDEBAR (Midnight Blue)
+         ========================================== -->
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <a href="../dashboard/dashboard.html" class="brand-link">
+          <div class="brand-logo-icon">RP</div>
+          <span class="brand-name">Rent<span>Proof</span></span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Portal</div>
+        
+        <!-- 1. Dashboard -->
+        <a href="../dashboard/dashboard.html" class="nav-item" data-tooltip="Dashboard">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <!-- 2. Properties -->
+        <a href="../properties/properties.html" class="nav-item" data-tooltip="Properties">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-label">Properties</span>
+        </a>
+
+        <div class="nav-section-title">Team Modules</div>
+
+        <!-- 3. Tenants -->
+        <a href="tenants.html" class="nav-item active" data-tooltip="Tenants">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Tenants</span>
+        </a>
+
+        <!-- 4. Rent & Payments -->
+        <a href="../payments/payments.html" class="nav-item" data-tooltip="Rent & Payments">
+          <span class="nav-icon">💳</span>
+          <span class="nav-label">Rent & Payments</span>
+        </a>
+
+        <!-- 5. Reminders -->
+        <a href="../reminders/reminders.html" class="nav-item" data-tooltip="Reminders">
+          <span class="nav-icon">🔔</span>
+          <span class="nav-label">Reminders</span>
+        </a>
+
+        <div class="nav-section-title">System</div>
+
+        <!-- 6. Reports -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports">
+          <span class="nav-icon">📈</span>
+          <span class="nav-label">Reports</span>
+        </a>
+
+        <!-- 7. Settings -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </a>
+      </nav>
+
+      <!-- 8. Sidebar Footer / Logout -->
+      <div class="sidebar-footer">
+        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Sign Out">
+          <span class="nav-icon">🚪</span>
+          <span class="logout-text">Sign Out</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- ==========================================
+         MAIN CONTENT WRAPPER
+         ========================================== -->
+    <div class="main-wrapper">
+
+      <!-- TOP NAVBAR -->
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Navigation Sidebar">
+            ☰
+          </button>
+          <a href="tenants.html" class="btn btn-outline" style="padding: 6px 14px; font-size: 0.85rem;">
+            ← Back to Tenants
+          </a>
+        </div>
+
+        <div class="navbar-right">
+          <div class="landlord-profile-pill">
+            <div class="profile-avatar" id="landlordAvatarInitials">AS</div>
+            <div class="profile-details">
+              <span class="profile-name" id="landlordDisplayName">Aditi Sharma</span>
+              <span class="profile-role">Landlord &bull; Active</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- PAGE CONTENT AREA -->
+      <main class="page-content">
+        <div class="page-container">
+
+          <!-- Edit Form Card -->
+          <div class="form-card">
+            
+            <div class="form-header">
+              <h2>Edit Tenant Profile</h2>
+              <p>Update personal contact details, agreed monthly rent, or current tenancy status.</p>
+            </div>
+
+            <!-- Current Room Assignment Summary Box -->
+            <div style="background-color: var(--ivory-card); border: 1px solid var(--sand); border-radius: var(--radius-sm); padding: 14px 18px; margin-bottom: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: gap; gap: 12px;">
+              <div>
+                <span style="font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--slate-muted); font-weight: 600;">Current Assignment:</span>
+                <div style="font-size: 1rem; font-weight: 700; color: var(--navy); margin-top: 2px;">
+                  🏢 <span id="displayPropertyName">Loading...</span> &bull; 🚪 <span id="displayRoomNumber">Loading...</span>
+                </div>
+              </div>
+              <a href="assign-property.html" class="btn btn-outline" style="padding: 6px 12px; font-size: 0.82rem;">
+                🔑 Reassign Room
+              </a>
+            </div>
+
+            <form id="editTenantForm" novalidate>
+              <input type="hidden" id="editTenantId">
+
+              <!-- Section 1: Contact Information -->
+              <div class="form-section-title">
+                👤 Contact &amp; Personal Information
+              </div>
+
+              <div class="form-grid">
+
+                <!-- Full Name -->
+                <div class="form-group">
+                  <label for="fullName">
+                    Tenant Full Name <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    id="fullName" 
+                    class="form-control" 
+                    placeholder="Full legal name"
+                    required
+                  >
+                  <span class="form-error-feedback" id="fullNameError"></span>
+                </div>
+
+                <!-- Phone Number -->
+                <div class="form-group">
+                  <label for="phone">
+                    Phone Number <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="tel" 
+                    id="phone" 
+                    class="form-control" 
+                    placeholder="10-digit mobile number"
+                    maxlength="10"
+                    required
+                  >
+                  <span class="form-error-feedback" id="phoneError"></span>
+                </div>
+
+                <!-- Email Address -->
+                <div class="form-group">
+                  <label for="email">
+                    Email Address <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="email" 
+                    id="email" 
+                    class="form-control" 
+                    placeholder="name@domain.com"
+                    required
+                  >
+                  <span class="form-error-feedback" id="emailError"></span>
+                </div>
+
+                <!-- Emergency Contact -->
+                <div class="form-group">
+                  <label for="emergencyContact">
+                    Emergency Contact Number
+                  </label>
+                  <input 
+                    type="tel" 
+                    id="emergencyContact" 
+                    class="form-control" 
+                    placeholder="10-digit number"
+                    maxlength="10"
+                  >
+                  <span class="form-error-feedback" id="emergencyContactError"></span>
+                </div>
+
+                <!-- Permanent Address -->
+                <div class="form-group col-span-2">
+                  <label for="permanentAddress">
+                    Permanent Address / ID Proof Details <span class="required">*</span>
+                  </label>
+                  <textarea 
+                    id="permanentAddress" 
+                    class="form-control" 
+                    rows="3" 
+                    placeholder="Permanent address and ID verification"
+                    required
+                  ></textarea>
+                  <span class="form-error-feedback" id="permanentAddressError"></span>
+                </div>
+
+              </div>
+
+              <!-- Section 2: Financial & Status Information -->
+              <div class="form-section-title">
+                💳 Rental Terms &amp; Tenancy Status
+              </div>
+
+              <div class="form-grid">
+
+                <!-- Monthly Rent -->
+                <div class="form-group">
+                  <label for="monthlyRent">
+                    Monthly Rent (₹) <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="number" 
+                    id="monthlyRent" 
+                    class="form-control" 
+                    min="0" 
+                    step="100" 
+                    required
+                  >
+                  <span class="form-hint">Agreed monthly rent amount (cannot be negative)</span>
+                  <span class="form-error-feedback" id="monthlyRentError"></span>
+                </div>
+
+                <!-- Tenant Status -->
+                <div class="form-group">
+                  <label for="tenantStatus">
+                    Tenancy Status <span class="required">*</span>
+                  </label>
+                  <select id="tenantStatus" class="form-control" required>
+                    <option value="Active">Active (Currently Residing)</option>
+                    <option value="Moved Out">Moved Out (Room will become Vacant)</option>
+                    <option value="Pending">Pending (Onboarding / Inactive)</option>
+                  </select>
+                  <span class="form-hint">Changing to 'Moved Out' automatically marks room as Vacant</span>
+                  <span class="form-error-feedback" id="tenantStatusError"></span>
+                </div>
+
+              </div>
+
+              <!-- Form Action Buttons -->
+              <div class="form-actions">
+                <a href="tenants.html" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary" id="saveEditBtn">
+                  💾 Save Changes
+                </button>
+              </div>
+
+            </form>
+
+          </div>
+
+        </div>
+      </main>
+
+    </div>
+
+  </div>
+
+  <!-- Shweta's Module JavaScript -->
+  <script src="../shared/security.js"></script>
+  <script src="tenants.js"></script>
+</body>
+</html>

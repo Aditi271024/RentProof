@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentProof - Register New Tenant</title>
+  <!-- Google Fonts: Bodoni Moda (Headings) & Poppins (UI / Body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
+  <!-- Shared Design System CSS -->
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="../shared/sidebar.css">
+  <!-- Shweta's Module CSS -->
+  <link rel="stylesheet" href="tenants.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ==========================================
+         COLLAPSIBLE LEFT SIDEBAR (Midnight Blue)
+         ========================================== -->
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <a href="../dashboard/dashboard.html" class="brand-link">
+          <div class="brand-logo-icon">RP</div>
+          <span class="brand-name">Rent<span>Proof</span></span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Portal</div>
+        
+        <!-- 1. Dashboard -->
+        <a href="../dashboard/dashboard.html" class="nav-item" data-tooltip="Dashboard">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <!-- 2. Properties -->
+        <a href="../properties/properties.html" class="nav-item" data-tooltip="Properties">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-label">Properties</span>
+        </a>
+
+        <div class="nav-section-title">Team Modules</div>
+
+        <!-- 3. Tenants -->
+        <a href="tenants.html" class="nav-item active" data-tooltip="Tenants">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Tenants</span>
+        </a>
+
+        <!-- 4. Rent & Payments -->
+        <a href="../payments/payments.html" class="nav-item" data-tooltip="Rent & Payments">
+          <span class="nav-icon">💳</span>
+          <span class="nav-label">Rent & Payments</span>
+        </a>
+
+        <!-- 5. Reminders -->
+        <a href="../reminders/reminders.html" class="nav-item" data-tooltip="Reminders">
+          <span class="nav-icon">🔔</span>
+          <span class="nav-label">Reminders</span>
+        </a>
+
+        <div class="nav-section-title">System</div>
+
+        <!-- 6. Reports -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports">
+          <span class="nav-icon">📈</span>
+          <span class="nav-label">Reports</span>
+        </a>
+
+        <!-- 7. Settings -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </a>
+      </nav>
+
+      <!-- 8. Sidebar Footer / Logout -->
+      <div class="sidebar-footer">
+        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Sign Out">
+          <span class="nav-icon">🚪</span>
+          <span class="logout-text">Sign Out</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- ==========================================
+         MAIN CONTENT WRAPPER
+         ========================================== -->
+    <div class="main-wrapper">
+
+      <!-- TOP NAVBAR -->
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Navigation Sidebar">
+            ☰
+          </button>
+          <a href="tenants.html" class="btn btn-outline" style="padding: 6px 14px; font-size: 0.85rem;">
+            ← Back to Tenants
+          </a>
+        </div>
+
+        <div class="navbar-right">
+          <div class="landlord-profile-pill">
+            <div class="profile-avatar" id="landlordAvatarInitials">AS</div>
+            <div class="profile-details">
+              <span class="profile-name" id="landlordDisplayName">Aditi Sharma</span>
+              <span class="profile-role">Landlord &bull; Active</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- PAGE CONTENT AREA -->
+      <main class="page-content">
+        <div class="page-container">
+
+          <!-- Registration Form Card -->
+          <div class="form-card">
+            
+            <div class="form-header">
+              <h2>Register New Tenant</h2>
+              <p>Enter tenant profile details and assign them to an available room in your properties.</p>
+            </div>
+
+            <form id="addTenantForm" novalidate>
+
+              <!-- Section 1: Personal & Contact Information -->
+              <div class="form-section-title">
+                👤 Personal &amp; Contact Details
+              </div>
+
+              <div class="form-grid">
+                
+                <!-- Tenant Full Name -->
+                <div class="form-group">
+                  <label for="fullName">
+                    Tenant Full Name <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="text" 
+                    id="fullName" 
+                    class="form-control" 
+                    placeholder="e.g. Rahul Sharma"
+                    required
+                  >
+                  <span class="form-hint">Official full name as per government ID</span>
+                  <span class="form-error-feedback" id="fullNameError"></span>
+                </div>
+
+                <!-- Phone Number -->
+                <div class="form-group">
+                  <label for="phone">
+                    Phone Number <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="tel" 
+                    id="phone" 
+                    class="form-control" 
+                    placeholder="e.g. 9876543210"
+                    maxlength="10"
+                    required
+                  >
+                  <span class="form-hint">10-digit Indian mobile number</span>
+                  <span class="form-error-feedback" id="phoneError"></span>
+                </div>
+
+                <!-- Email Address -->
+                <div class="form-group">
+                  <label for="email">
+                    Email Address <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="email" 
+                    id="email" 
+                    class="form-control" 
+                    placeholder="e.g. rahul.sharma@gmail.com"
+                    required
+                  >
+                  <span class="form-hint">Used for sending rent receipts and payment reminders</span>
+                  <span class="form-error-feedback" id="emailError"></span>
+                </div>
+
+                <!-- Emergency Contact -->
+                <div class="form-group">
+                  <label for="emergencyContact">
+                    Emergency Contact Number
+                  </label>
+                  <input 
+                    type="tel" 
+                    id="emergencyContact" 
+                    class="form-control" 
+                    placeholder="e.g. 9811223344"
+                    maxlength="10"
+                  >
+                  <span class="form-hint">Parent / Guardian / Spouse 10-digit phone number</span>
+                  <span class="form-error-feedback" id="emergencyContactError"></span>
+                </div>
+
+                <!-- Permanent Address -->
+                <div class="form-group col-span-2">
+                  <label for="permanentAddress">
+                    Permanent Address / ID Proof Details <span class="required">*</span>
+                  </label>
+                  <textarea 
+                    id="permanentAddress" 
+                    class="form-control" 
+                    rows="3" 
+                    placeholder="e.g. House No. 42, Civil Lines, Jaipur, Rajasthan - 302006 (Aadhaar: 1234-5678-9012)"
+                    required
+                  ></textarea>
+                  <span class="form-hint">Permanent residence address and Aadhaar/PAN/Passport verification detail</span>
+                  <span class="form-error-feedback" id="permanentAddressError"></span>
+                </div>
+
+              </div>
+
+              <!-- Section 2: Property & Room Assignment -->
+              <div class="form-section-title">
+                🏢 Property &amp; Room Assignment
+              </div>
+
+              <div class="form-grid">
+
+                <!-- Property Selection -->
+                <div class="form-group">
+                  <label for="propertySelect">
+                    Property Selection <span class="required">*</span>
+                  </label>
+                  <select id="propertySelect" class="form-control" required>
+                    <option value="">-- Choose Property --</option>
+                  </select>
+                  <span class="form-hint">Select the building where the tenant will reside</span>
+                  <span class="form-error-feedback" id="propertySelectError"></span>
+                </div>
+
+                <!-- Room Selection (Dynamically populated with VACANT rooms only) -->
+                <div class="form-group">
+                  <label for="roomSelect">
+                    Room Selection <span class="required">*</span>
+                  </label>
+                  <select id="roomSelect" class="form-control" disabled required>
+                    <option value="">-- Select Property First --</option>
+                  </select>
+                  <span class="form-hint">Only available vacant rooms are shown</span>
+                  <span class="form-error-feedback" id="roomSelectError"></span>
+                </div>
+
+                <!-- Selected Property Information Preview -->
+                <div class="form-group col-span-2">
+                  <div class="property-info-box" id="propertyInfoBox">
+                    <!-- Populated dynamically by tenants.js -->
+                  </div>
+                </div>
+
+                <!-- Joining Date -->
+                <div class="form-group">
+                  <label for="moveInDate">
+                    Joining Date (Move-in Date) <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="date" 
+                    id="moveInDate" 
+                    class="form-control" 
+                    required
+                  >
+                  <span class="form-hint">Date when tenant starts tenancy</span>
+                  <span class="form-error-feedback" id="moveInDateError"></span>
+                </div>
+
+                <!-- Monthly Rent -->
+                <div class="form-group">
+                  <label for="monthlyRent">
+                    Monthly Rent (₹) <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="number" 
+                    id="monthlyRent" 
+                    class="form-control" 
+                    min="0" 
+                    step="100" 
+                    placeholder="e.g. 8500"
+                    required
+                  >
+                  <span class="form-hint">Auto-populated from room rate (cannot be negative)</span>
+                  <span class="form-error-feedback" id="monthlyRentError"></span>
+                </div>
+
+                <!-- Security Deposit -->
+                <div class="form-group">
+                  <label for="securityDeposit">
+                    Security Deposit (₹)
+                  </label>
+                  <input 
+                    type="number" 
+                    id="securityDeposit" 
+                    class="form-control" 
+                    min="0" 
+                    step="500" 
+                    placeholder="e.g. 17000"
+                    value="0"
+                  >
+                  <span class="form-hint">Refundable security advance collected (cannot be negative)</span>
+                  <span class="form-error-feedback" id="securityDepositError"></span>
+                </div>
+
+              </div>
+
+              <!-- Form Action Buttons -->
+              <div class="form-actions">
+                <a href="tenants.html" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary" id="saveTenantBtn">
+                  💾 Save Tenant
+                </button>
+              </div>
+
+            </form>
+
+          </div>
+
+        </div>
+      </main>
+
+    </div>
+
+  </div>
+
+  <!-- Shweta's Module JavaScript -->
+  <script src="../shared/security.js"></script>
+  <script src="tenants.js"></script>
+</body>
+</html>
+

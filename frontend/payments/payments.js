@@ -3,8 +3,7 @@
  * Vanilla JavaScript (No Frameworks)
  * 
  * Features:
- * - Dynamic Backend API connectivity with graceful offline localStorage fallback
- * - Seed dataset matching database/rentproof.sql exactly
+ * - Dynamic Backend API connectivity backed by MySQL
  * - Real-time statistics (Total Collected, Successful, Pending, Overdue)
  * - Add Payment workflow with cascading Tenant -> Property -> Room auto-fill
  * - Interactive Real-Time Receipt Preview during payment entry
@@ -151,213 +150,175 @@ const SEED_PAYMENTS = [
 ];
 
 // Document Initialization
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  if (!(await window.RentProofSecurity.requireSession())) return;
   setupNavigationAndSidebar();
   setupActiveUser();
 
-  if (document.getElementById("paymentsDashboardView")) {
-    initPaymentsDashboard();
-  } else if (document.getElementById("addPaymentForm")) {
-    initAddPaymentForm();
-  } else if (document.getElementById("paymentHistoryView")) {
-    initPaymentHistory();
+  document.addEventListener("click", handlePaymentActionClick);
+  try {
+    if (document.getElementById("paymentsDashboardView")) {
+      await initPaymentsDashboard();
+    } else if (document.getElementById("addPaymentForm")) {
+      await initAddPaymentForm();
+    } else if (document.getElementById("paymentHistoryView")) {
+      await initPaymentHistory();
+    }
+  } catch (error) {
+    console.error("[PaymentUI] Could not initialize the current page:", error);
+    showToast(error.message || "Could not load payment data.", "error");
   }
 });
 
+function handlePaymentActionClick(event) {
+  const button = event.target.closest("[data-payment-action]");
+  if (!button) return;
+
+  const paymentId = Number(button.dataset.paymentId);
+  switch (button.dataset.paymentAction) {
+    case "receipt":
+      viewPaymentReceipt(paymentId);
+      break;
+    case "status":
+      openStatusModal(paymentId, button.dataset.paymentStatus || "");
+      break;
+    case "delete":
+      confirmDeletePayment(paymentId);
+      break;
+    case "close-receipt":
+      closeReceiptModal();
+      break;
+    case "print-receipt":
+      printReceipt();
+      break;
+    case "close-status":
+      closeStatusModal();
+      break;
+    case "save-status":
+      saveStatusModalChange();
+      break;
+    case "notification":
+      showToast("No new payment notifications.", "info");
+      break;
+  }
+}
+
 /* ==============================================================================
-   DATA ACCESS LAYER (API First with LocalStorage Fallback)
+   DATA ACCESS LAYER (Backend API)
    ============================================================================== */
 
 /**
- * Loads all payments asynchronously from Java backend API or localStorage.
+ * Loads all payments asynchronously from live Java backend API.
  */
 async function loadPayments() {
-  try {
-    const res = await fetch(`${API_BASE}/api/payments`);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
-        saveLocalPayments(data);
-        return data;
-      }
-    }
-  } catch (err) {
-    // Backend offline or running in file:// protocol; fall back to localStorage
-  }
-  return getLocalPayments();
+  const res = await fetch(`${API_BASE}/api/payments`);
+  if (!res.ok) throw new Error("Failed to fetch payments from the backend.");
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error("The backend returned an invalid payments response.");
+  return data;
 }
 
 /**
- * Loads dashboard statistics.
+ * Loads dashboard statistics directly from MySQL aggregation.
  */
 async function loadDashboardStats() {
-  try {
-    const res = await fetch(`${API_BASE}/api/payments/stats`);
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (err) {
-    // Offline calculation
-  }
-
-  const payments = getLocalPayments();
-  let totalCollected = 0;
-  let successful = 0;
-  let pending = 0;
-  let overdue = 0;
-
-  payments.forEach((p) => {
-    if (p.paymentStatus === "Paid") {
-      totalCollected += Number(p.amount) || 0;
-      successful++;
-    } else if (p.paymentStatus === "Pending") {
-      pending++;
-    } else if (p.paymentStatus === "Overdue") {
-      overdue++;
-    }
-  });
-
+  const res = await fetch(`${API_BASE}/api/payments/stats`);
+  if (!res.ok) throw new Error("Failed to fetch payment statistics from the backend.");
+  const stats = await res.json();
   return {
-    totalRentCollected: totalCollected,
-    successfulPaymentCount: successful,
-    pendingPaymentCount: pending,
-    overduePaymentCount: overdue
+    totalRentCollected: stats.totalCollected || 0,
+    successfulPaymentCount: stats.successful || 0,
+    pendingPaymentCount: stats.pending || 0,
+    overduePaymentCount: stats.overdue || 0
   };
 }
 
 /**
- * Loads active tenants list.
+ * Loads active tenants list from live MySQL database.
  */
 async function loadTenants() {
-  try {
-    const res = await fetch(`${API_BASE}/api/tenants`);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) return data;
-    }
-  } catch (err) {}
-  return [...SEED_TENANTS];
+  const res = await fetch(`${API_BASE}/api/tenants`);
+  if (!res.ok) throw new Error("Failed to fetch tenants from the backend.");
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error("The backend returned an invalid tenants response.");
+  return data;
 }
 
 /**
- * Loads properties list.
+ * Loads properties list from live MySQL database.
  */
 async function loadProperties() {
-  try {
-    const res = await fetch(`${API_BASE}/api/properties`);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) return data;
-    }
-  } catch (err) {}
-  return [...SEED_PROPERTIES];
+  const res = await fetch(`${API_BASE}/api/properties`);
+  if (!res.ok) throw new Error("Failed to fetch properties from the backend.");
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error("The backend returned an invalid properties response.");
+  return data;
 }
 
 /**
- * Loads rooms by property.
+ * Loads rooms by property from live MySQL database.
  */
 async function loadRooms(propertyId) {
-  try {
-    const res = await fetch(`${API_BASE}/api/rooms?propertyId=${propertyId}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) return data;
-    }
-  } catch (err) {}
-  return SEED_ROOMS.filter((r) => Number(r.propertyId) === Number(propertyId));
+  const res = await fetch(`${API_BASE}/api/rooms?propertyId=${encodeURIComponent(propertyId)}`);
+  if (!res.ok) throw new Error("Failed to fetch rooms from the backend.");
+  const data = await res.json();
+  if (!Array.isArray(data)) throw new Error("The backend returned an invalid rooms response.");
+  return data;
 }
 
 /**
- * Saves a new payment record.
+ * Saves a new payment record directly into MySQL.
  */
 async function createPayment(paymentData) {
-  let backendSuccess = false;
-  let generatedId = null;
+  const res = await fetch(`${API_BASE}/api/payments/add`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(paymentData)
+  });
 
-  try {
-    const res = await fetch(`${API_BASE}/api/payments/add`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(paymentData)
-    });
-    if (res.ok) {
-      const resp = await res.json();
-      if (resp.success) {
-        backendSuccess = true;
-        generatedId = resp.paymentId;
-      }
-    }
-  } catch (err) {}
+  const resp = await res.json().catch(() => ({}));
+  if (!res.ok || !resp.success) {
+    throw new Error(resp.error || "Failed to record payment in database.");
+  }
 
-  // Update local storage
-  const payments = getLocalPayments();
-  const nextId = generatedId || (payments.length > 0 ? Math.max(...payments.map((p) => p.paymentId || 0)) + 1 : 1);
-  const newRecord = {
-    ...paymentData,
-    paymentId: nextId,
-    amount: parseFloat(paymentData.amount)
-  };
-  payments.unshift(newRecord);
-  saveLocalPayments(payments);
-
-  return { success: true, paymentId: nextId, backendSynced: backendSuccess };
+  const generatedId = resp.paymentId;
+  return { success: true, paymentId: generatedId, backendSynced: true };
 }
 
 /**
- * Updates payment status.
+ * Updates payment status directly in MySQL.
  */
 async function updatePaymentStatus(paymentId, newStatus) {
-  try {
-    await fetch(`${API_BASE}/api/payments/update-status`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paymentId, paymentStatus: newStatus })
-    });
-  } catch (err) {}
+  const res = await fetch(`${API_BASE}/api/payments/update-status`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paymentId, status: newStatus })
+  });
 
-  const payments = getLocalPayments();
-  const target = payments.find((p) => p.paymentId === paymentId);
-  if (target) {
-    target.paymentStatus = newStatus;
-    saveLocalPayments(payments);
+  const resp = await res.json().catch(() => ({}));
+  if (!res.ok || !resp.success) {
+    throw new Error(resp.error || "Failed to update payment status in database.");
   }
+
   return true;
 }
 
 /**
- * Deletes a payment record.
+ * Deletes a payment record directly from MySQL.
  */
 async function deletePayment(paymentId) {
-  try {
-    await fetch(`${API_BASE}/api/payments/delete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paymentId })
-    });
-  } catch (err) {}
+  const res = await fetch(`${API_BASE}/api/payments/delete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ paymentId })
+  });
 
-  const payments = getLocalPayments();
-  const filtered = payments.filter((p) => p.paymentId !== paymentId);
-  saveLocalPayments(filtered);
-  return true;
-}
-
-// LocalStorage helpers
-function getLocalPayments() {
-  const stored = localStorage.getItem("rentproof_payments");
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      console.error("Failed to parse stored payments:", e);
-    }
+  const resp = await res.json().catch(() => ({}));
+  if (!res.ok || !resp.success) {
+    throw new Error(resp.error || "Failed to delete payment from database.");
   }
-  saveLocalPayments(SEED_PAYMENTS);
-  return [...SEED_PAYMENTS];
-}
 
-function saveLocalPayments(payments) {
-  localStorage.setItem("rentproof_payments", JSON.stringify(payments));
+  return true;
 }
 
 /* ==============================================================================
@@ -417,8 +378,8 @@ async function renderRecentPaymentsTable() {
       <td><span class="badge-status status-${(p.paymentStatus || "").toLowerCase()}">${escapeHtml(p.paymentStatus)}</span></td>
       <td>
         <div class="table-actions">
-          <button class="btn-table-action" onclick="viewPaymentReceipt(${p.paymentId})" title="View Official Receipt">📄 Receipt</button>
-          <button class="btn-table-action" onclick="openStatusModal(${p.paymentId}, '${p.paymentStatus}')" title="Change Status">✏️ Status</button>
+          <button class="btn-table-action" data-payment-action="receipt" data-payment-id="${p.paymentId}" title="View Official Receipt">📄 Receipt</button>
+          <button class="btn-table-action" data-payment-action="status" data-payment-id="${p.paymentId}" data-payment-status="${escapeHtml(p.paymentStatus)}" title="Change Status">✏️ Status</button>
         </div>
       </td>
     </tr>
@@ -435,7 +396,7 @@ let allTenants = [];
 let allProperties = [];
 
 async function initAddPaymentForm() {
-  allTenants = await loadTenants();
+  allTenants = (await loadTenants()).filter((tenant) => tenant.tenantStatus === "Active");
   allProperties = await loadProperties();
 
   // Populate Tenant Dropdown
@@ -896,9 +857,9 @@ function renderHistoryTable() {
       <td><span class="badge-status status-${(p.paymentStatus || "").toLowerCase()}">${escapeHtml(p.paymentStatus)}</span></td>
       <td>
         <div class="table-actions">
-          <button class="btn-table-action" onclick="viewPaymentReceipt(${p.paymentId})" title="View Official Receipt">📄 Receipt</button>
-          <button class="btn-table-action" onclick="openStatusModal(${p.paymentId}, '${p.paymentStatus}')" title="Update Status">✏️</button>
-          <button class="btn-table-action danger" onclick="confirmDeletePayment(${p.paymentId})" title="Delete Payment">🗑️</button>
+          <button class="btn-table-action" data-payment-action="receipt" data-payment-id="${p.paymentId}" title="View Official Receipt">📄 Receipt</button>
+          <button class="btn-table-action" data-payment-action="status" data-payment-id="${p.paymentId}" data-payment-status="${escapeHtml(p.paymentStatus)}" title="Update Status">✏️</button>
+          <button class="btn-table-action danger" data-payment-action="delete" data-payment-id="${p.paymentId}" title="Delete Payment">🗑️</button>
         </div>
       </td>
     </tr>
@@ -1045,16 +1006,6 @@ function setupActiveUser() {
     avatarEl.textContent = initials || "AV";
   }
 
-  const logoutBtn = document.getElementById("logoutBtn");
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      if (confirm("Are you sure you want to sign out of RentProof?")) {
-        localStorage.removeItem("rentproof_user");
-        window.location.href = "../auth/login.html";
-      }
-    });
-  }
 }
 
 function showModuleNotice(moduleName, memberName) {

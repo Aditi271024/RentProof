@@ -1,17 +1,14 @@
 package com.rentproof.dashboard;
 
 import java.util.ArrayList;
-import java.util.Map;
 
 /**
- * DashboardService - Business Logic Layer for Dashboard Metrics & Analytics
- * Module: Dashboard Module
- * Developer: Gungun (BTech CSE Project)
+ * DashboardService - Business Logic and Service Layer for Dashboard.
  * 
- * Responsibilities:
- * - Decouples presentation and HTTP layer from direct SQL queries
- * - Applies business aggregations and data validation
- * - Computes real-time occupancy and collection indicators
+ * Strict compliance with Core Java SE syllabus:
+ * - Encapsulation
+ * - Defensive copying and null handling
+ * - Clean method contracts
  */
 public class DashboardService {
 
@@ -26,26 +23,52 @@ public class DashboardService {
     }
 
     /**
-     * Retrieves aggregated system metrics for the landlord.
+     * Retrieves aggregated portfolio statistics for a landlord.
      */
-    public DashboardStats getDashboardStats(int landlordId) {
-        int targetId = landlordId > 0 ? landlordId : 1;
-        return dashboardDAO.getDashboardStats(targetId);
+    public DashboardStats getStats(int landlordId) {
+        if (landlordId <= 0) {
+            landlordId = 1; // Default to demo landlord (Aditi Sharma)
+        }
+        return dashboardDAO.getDashboardStats(landlordId);
     }
 
     /**
-     * Retrieves recent activity audit trail.
+     * Retrieves property room breakdown list.
      */
-    public ArrayList<Map<String, String>> getRecentActivities(int landlordId, int limit) {
-        int targetId = landlordId > 0 ? landlordId : 1;
-        return dashboardDAO.getRecentActivities(targetId, limit > 0 ? limit : 8);
+    public ArrayList<PropertyOverviewDTO> getPropertyOverview(int landlordId) {
+        if (landlordId <= 0) {
+            landlordId = 1;
+        }
+        return dashboardDAO.getPropertyOverview(landlordId);
     }
 
     /**
-     * Retrieves actionable urgent reminders for the dashboard.
+     * Retrieves recent payments list.
      */
-    public ArrayList<Map<String, Object>> getUrgentReminders(int landlordId, int limit) {
-        int targetId = landlordId > 0 ? landlordId : 1;
-        return dashboardDAO.getUrgentReminders(targetId, limit > 0 ? limit : 5);
+    public ArrayList<PaymentRecordDTO> getRecentPayments(int landlordId, int limit) {
+        if (landlordId <= 0) {
+            landlordId = 1;
+        }
+        return dashboardDAO.getRecentPayments(landlordId, limit);
+    }
+
+    /**
+     * Retrieves pending rent list.
+     */
+    public ArrayList<PaymentRecordDTO> getPendingRent(int landlordId) {
+        if (landlordId <= 0) {
+            landlordId = 1;
+        }
+        return dashboardDAO.getPendingRent(landlordId);
+    }
+
+    /**
+     * Retrieves upcoming reminders list.
+     */
+    public ArrayList<ReminderDTO> getUpcomingReminders(int landlordId, int limit) {
+        if (landlordId <= 0) {
+            landlordId = 1;
+        }
+        return dashboardDAO.getUpcomingReminders(landlordId, limit);
     }
 }

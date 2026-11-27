@@ -61,42 +61,52 @@ const SEED_PROPERTIES = [
 ];
 
 // Initialize on page load
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  if (!(await window.RentProofSecurity.requireSession())) return;
   setupNavigationAndSidebar();
   setupActiveUser();
+  setupPropertyPageActions();
 
-  // Detect which page is currently open
-  if (document.getElementById("propertiesGrid")) {
-    initPropertiesDashboard();
-  } else if (document.getElementById("addPropertyForm")) {
-    initAddPropertyForm();
-  } else if (document.getElementById("editPropertyForm")) {
-    initEditPropertyForm();
+  try {
+    if (document.getElementById("propertiesGrid")) {
+      await initPropertiesDashboard();
+    } else if (document.getElementById("addPropertyForm")) {
+      initAddPropertyForm();
+    } else if (document.getElementById("editPropertyForm")) {
+      await initEditPropertyForm();
+    }
+  } catch (error) {
+    console.error("[PropertyUI] Could not initialize the current page:", error);
+    alert(error.message || "Could not load property data.");
   }
 });
 
+let loadedProperties = [];
+
 /**
- * Loads properties from localStorage or seeds initial demo dataset.
+ * Loads properties directly from the live Core Java / MySQL backend.
  */
-function getProperties() {
-  const stored = localStorage.getItem("rentproof_properties");
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch (e) {
-      console.error("Error parsing stored properties:", e);
-    }
-  }
-  // If empty, initialize with seed
-  saveProperties(SEED_PROPERTIES);
-  return [...SEED_PROPERTIES];
+async function fetchPropertiesFromBackend() {
+  const res = await fetch("/api/properties");
+  if (!res.ok) throw new Error("Could not load properties from the backend.");
+  const properties = await res.json();
+  if (!Array.isArray(properties)) throw new Error("The backend returned an invalid properties response.");
+  loadedProperties = properties;
+  return loadedProperties;
 }
 
 /**
- * Saves properties array into localStorage.
+ * Returns current property list in memory.
+ */
+function getProperties() {
+  return loadedProperties;
+}
+
+/**
+ * Saves properties array into localStorage (cache).
  */
 function saveProperties(properties) {
-  localStorage.setItem("rentproof_properties", JSON.stringify(properties));
+  loadedProperties = properties;
 }
 
 /**
@@ -134,8 +144,8 @@ function setupNavigationAndSidebar() {
  */
 function setupActiveUser() {
   const user = JSON.parse(localStorage.getItem("rentproof_user")) || {
-    fullName: "Aditi Sharma",
-    email: "aditi.landlord@rentproof.com"
+    fullName: "Landlord",
+    email: ""
   };
 
   const nameEl = document.getElementById("landlordDisplayName");
@@ -154,16 +164,33 @@ function setupActiveUser() {
     avatarEl.textContent = initials || "AS";
   }
 
-  // Setup logout handler
-  const logoutBtn = document.getElementById("logoutBtn");
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      if (confirm("Are you sure you want to sign out of RentProof?")) {
-        localStorage.removeItem("rentproof_user");
-        window.location.href = "../auth/login.html";
-      }
+}
+
+function setupPropertyPageActions() {
+  const notificationButton = document.getElementById("notificationButton");
+  if (notificationButton) {
+    notificationButton.addEventListener("click", () => {
+      alert("No unread notifications at this time.");
     });
+  }
+
+  const profilePill = document.getElementById("landlordProfilePill");
+  if (profilePill) {
+    profilePill.addEventListener("click", () => {
+      alert("Logged in Landlord: Aditi Sharma\nRole: Property Administrator\nModule: Database, Auth & Properties");
+    });
+  }
+
+  document.querySelectorAll('[data-action="close-details"]').forEach((button) => {
+    button.addEventListener("click", closeDetailsModal);
+  });
+  document.querySelectorAll('[data-action="close-delete"]').forEach((button) => {
+    button.addEventListener("click", closeDeleteModal);
+  });
+
+  const confirmDeleteButton = document.querySelector('[data-action="confirm-delete"]');
+  if (confirmDeleteButton) {
+    confirmDeleteButton.addEventListener("click", confirmExecuteDelete);
   }
 }
 
@@ -183,7 +210,26 @@ function showModuleNotice(moduleName, memberName) {
 let currentFilterType = "ALL";
 let currentSearchQuery = "";
 
-function initPropertiesDashboard() {
+async function initPropertiesDashboard() {
+  await fetchPropertiesFromBackend();
+  const grid = document.getElementById("propertiesGrid");
+  if (grid) {
+    grid.addEventListener("click", (event) => {
+      const target = event.target instanceof Element
+        ? event.target.closest("[data-property-action]")
+        : null;
+      if (!target || !grid.contains(target)) return;
+
+      const propertyId = Number(target.dataset.propertyId);
+      if (!Number.isInteger(propertyId)) return;
+
+      if (target.dataset.propertyAction === "details") {
+        viewPropertyDetails(propertyId);
+      } else if (target.dataset.propertyAction === "delete") {
+        promptDeleteProperty(propertyId);
+      }
+    });
+  }
   calculateAndRenderStats();
   renderFilteredProperties();
 
@@ -323,14 +369,17 @@ function renderFilteredProperties() {
         </div>
 
         <div class="property-card-actions">
-          <button class="btn btn-outline btn-sm" onclick="viewPropertyDetails(${prop.propertyId})">
+          <a href="rooms.html?propertyId=${encodeURIComponent(prop.propertyId)}" class="btn btn-outline btn-sm">
+            🚪 Manage Rooms
+          </a>
+          <button class="btn btn-outline btn-sm" data-property-action="details" data-property-id="${prop.propertyId}">
             🔍 Details
           </button>
           <div class="card-action-btns">
             <a href="edit-property.html?id=${prop.propertyId}" class="btn btn-secondary btn-sm">
               ✏️ Edit
             </a>
-            <button class="btn btn-danger btn-sm" onclick="promptDeleteProperty(${prop.propertyId})">
+            <button class="btn btn-danger btn-sm" data-property-action="delete" data-property-id="${prop.propertyId}">
               🗑️ Delete
             </button>
           </div>
@@ -426,19 +475,32 @@ function closeDeleteModal() {
   if (modal) modal.classList.remove("active");
 }
 
-function confirmExecuteDelete() {
+async function confirmExecuteDelete() {
   if (!propertyPendingDeletion) return;
 
-  let properties = getProperties();
-  properties = properties.filter((p) => p.propertyId !== propertyPendingDeletion);
-  saveProperties(properties);
-
-  closeDeleteModal();
-  calculateAndRenderStats();
-  renderFilteredProperties();
-
-  // Show toast notification
-  alert("Property successfully removed from inventory.");
+  const user = JSON.parse(localStorage.getItem("rentproof_user")) || { landlordId: 1 };
+  try {
+    const res = await fetch("/api/properties/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        propertyId: propertyPendingDeletion,
+        landlordId: user.landlordId || 1
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      closeDeleteModal();
+      await fetchPropertiesFromBackend();
+      calculateAndRenderStats();
+      renderFilteredProperties();
+      alert("Property successfully removed from MySQL database.");
+    } else {
+      alert("Cannot delete property: " + (data.error || "It may have active tenants or rooms attached."));
+    }
+  } catch (err) {
+    alert("Server communication error: " + err.message);
+  }
 }
 
 /* ==============================================================================
@@ -549,11 +611,9 @@ function initAddPropertyForm() {
 
     if (!isValid) return;
 
-    // Construct new property
-    const properties = getProperties();
-    const newProperty = {
-      propertyId: Date.now(),
-      landlordId: 1, // Current logged-in landlord
+    const user = JSON.parse(localStorage.getItem("rentproof_user")) || { landlordId: 1 };
+    const payload = {
+      landlordId: user.landlordId || 1,
       propertyName: nameInput.value.trim(),
       propertyType: typeSelect.value,
       address: addressInput.value.trim(),
@@ -561,16 +621,41 @@ function initAddPropertyForm() {
       state: stateInput.value.trim(),
       pincode: pincodeInput.value.trim(),
       totalRooms: totalRooms,
-      occupiedRooms: 0,
       monthlyRent: rent,
       description: descInput.value.trim()
     };
 
-    properties.unshift(newProperty);
-    saveProperties(properties);
+    const submitBtn = form.querySelector("button[type='submit']");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Saving to MySQL Database...";
+    }
 
-    alert("Property added successfully! Redirecting to properties dashboard...");
-    window.location.href = "properties.html";
+    fetch("/api/properties/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (res.ok && data.success) {
+          alert("Property added successfully to MySQL! Redirecting to properties dashboard...");
+          window.location.href = "properties.html";
+        } else {
+          alert("Error adding property: " + (data.error || "Database error"));
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "💾 Save Property";
+          }
+        }
+      })
+      .catch((err) => {
+        alert("Failed to connect to backend: " + err.message);
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "💾 Save Property";
+        }
+      });
   });
 }
 
@@ -578,15 +663,15 @@ function initAddPropertyForm() {
    EDIT PROPERTY (edit-property.html)
    ============================================================================== */
 
-function initEditPropertyForm() {
+async function initEditPropertyForm() {
   const form = document.getElementById("editPropertyForm");
   if (!form) return;
 
   const urlParams = new URLSearchParams(window.location.search);
   const propertyId = parseInt(urlParams.get("id"));
 
-  const properties = getProperties();
-  const property = properties.find((p) => p.propertyId === propertyId);
+  await fetchPropertiesFromBackend();
+  const property = loadedProperties.find((p) => p.propertyId === propertyId);
 
   if (!property) {
     alert("Property record not found. Returning to dashboard.");
@@ -662,24 +747,52 @@ function initEditPropertyForm() {
 
     if (!isValid) return;
 
-    // Update property details in storage
-    const allProps = getProperties();
-    const index = allProps.findIndex((p) => p.propertyId === propertyId);
-    if (index !== -1) {
-      allProps[index].propertyName = nameInput.value.trim();
-      allProps[index].propertyType = typeSelect.value;
-      allProps[index].address = addressInput.value.trim();
-      allProps[index].city = cityInput.value.trim();
-      allProps[index].state = stateInput.value.trim();
-      allProps[index].pincode = pincodeInput.value.trim();
-      allProps[index].totalRooms = totalRooms;
-      allProps[index].monthlyRent = rent;
-      allProps[index].description = descInput.value.trim();
+    const user = JSON.parse(localStorage.getItem("rentproof_user")) || { landlordId: 1 };
+    const payload = {
+      propertyId: propertyId,
+      landlordId: user.landlordId || 1,
+      propertyName: nameInput.value.trim(),
+      propertyType: typeSelect.value,
+      address: addressInput.value.trim(),
+      city: cityInput.value.trim(),
+      state: stateInput.value.trim(),
+      pincode: pincodeInput.value.trim(),
+      totalRooms: totalRooms,
+      monthlyRent: rent,
+      description: descInput.value.trim()
+    };
 
-      saveProperties(allProps);
-      alert("Property updated successfully!");
-      window.location.href = "properties.html";
+    const submitBtn = form.querySelector("button[type='submit']");
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Updating in MySQL...";
     }
+
+    fetch("/api/properties/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (res.ok && data.success) {
+          alert("Property updated successfully in MySQL database!");
+          window.location.href = "properties.html";
+        } else {
+          alert("Error updating property: " + (data.error || "Database error"));
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "💾 Update Property";
+          }
+        }
+      })
+      .catch((err) => {
+        alert("Server communication error: " + err.message);
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "💾 Update Property";
+        }
+      });
   });
 }
 

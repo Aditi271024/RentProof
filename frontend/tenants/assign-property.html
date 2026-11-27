@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentProof - Property &amp; Room Assignment</title>
+  <!-- Google Fonts: Bodoni Moda (Headings) & Poppins (UI / Body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
+  <!-- Shared Design System CSS -->
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="../shared/sidebar.css">
+  <!-- Shweta's Module CSS -->
+  <link rel="stylesheet" href="tenants.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ==========================================
+         COLLAPSIBLE LEFT SIDEBAR (Midnight Blue)
+         ========================================== -->
+    <aside class="sidebar" id="appSidebar">
+      <div class="sidebar-header">
+        <a href="../dashboard/dashboard.html" class="brand-link">
+          <div class="brand-logo-icon">RP</div>
+          <span class="brand-name">Rent<span>Proof</span></span>
+        </a>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Portal</div>
+        
+        <!-- 1. Dashboard -->
+        <a href="../dashboard/dashboard.html" class="nav-item" data-tooltip="Dashboard">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <!-- 2. Properties -->
+        <a href="../properties/properties.html" class="nav-item" data-tooltip="Properties">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-label">Properties</span>
+        </a>
+
+        <div class="nav-section-title">Team Modules</div>
+
+        <!-- 3. Tenants -->
+        <a href="tenants.html" class="nav-item active" data-tooltip="Tenants">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Tenants</span>
+        </a>
+
+        <!-- 4. Rent & Payments -->
+        <a href="../payments/payments.html" class="nav-item" data-tooltip="Rent & Payments">
+          <span class="nav-icon">💳</span>
+          <span class="nav-label">Rent & Payments</span>
+        </a>
+
+        <!-- 5. Reminders -->
+        <a href="../reminders/reminders.html" class="nav-item" data-tooltip="Reminders">
+          <span class="nav-icon">🔔</span>
+          <span class="nav-label">Reminders</span>
+        </a>
+
+        <div class="nav-section-title">System</div>
+
+        <!-- 6. Reports -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports">
+          <span class="nav-icon">📈</span>
+          <span class="nav-label">Reports</span>
+        </a>
+
+        <!-- 7. Settings -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </a>
+      </nav>
+
+      <!-- 8. Sidebar Footer / Logout -->
+      <div class="sidebar-footer">
+        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Sign Out">
+          <span class="nav-icon">🚪</span>
+          <span class="logout-text">Sign Out</span>
+        </a>
+      </div>
+    </aside>
+
+    <!-- ==========================================
+         MAIN CONTENT WRAPPER
+         ========================================== -->
+    <div class="main-wrapper">
+
+      <!-- TOP NAVBAR -->
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Navigation Sidebar">
+            ☰
+          </button>
+          <a href="tenants.html" class="btn btn-outline" style="padding: 6px 14px; font-size: 0.85rem;">
+            ← Back to Tenants
+          </a>
+        </div>
+
+        <div class="navbar-right">
+          <div class="landlord-profile-pill">
+            <div class="profile-avatar" id="landlordAvatarInitials">AS</div>
+            <div class="profile-details">
+              <span class="profile-name" id="landlordDisplayName">Aditi Sharma</span>
+              <span class="profile-role">Landlord &bull; Active</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- PAGE CONTENT AREA -->
+      <main class="page-content">
+        <div class="page-container">
+
+          <!-- Property Assignment Form Card -->
+          <div class="form-card">
+            
+            <div class="form-header">
+              <h2>Assign Tenant to Property &amp; Room</h2>
+              <p>Allocate a tenant to an available vacant room. Occupied rooms cannot be assigned.</p>
+            </div>
+
+            <!-- Informational Banner -->
+            <div style="background-color: var(--info-bg); border-left: 4px solid var(--info); border-radius: var(--radius-sm); padding: 14px 18px; margin-bottom: 24px;">
+              <strong style="color: var(--navy); font-size: 0.92rem;">💡 Room Occupancy Integrity:</strong>
+              <p style="font-size: 0.85rem; color: var(--slate); margin-top: 4px;">
+                Selecting a property will dynamically display <strong>only vacant rooms</strong>. Once assigned, the target room will automatically be marked <strong>Occupied</strong>, and any previously assigned room will be freed back to <strong>Vacant</strong>.
+              </p>
+            </div>
+
+            <form id="assignPropertyForm" novalidate>
+
+              <div class="form-section-title">
+                🔑 Assignment Details
+              </div>
+
+              <div class="form-grid">
+
+                <!-- 1. Select Tenant -->
+                <div class="form-group col-span-2">
+                  <label for="assignTenantSelect">
+                    Select Tenant <span class="required">*</span>
+                  </label>
+                  <select id="assignTenantSelect" class="form-control" required>
+                    <option value="">-- Choose Tenant --</option>
+                  </select>
+                  <span class="form-hint">Choose tenant to allocate or transfer</span>
+                  <span class="form-error-feedback" id="assignTenantSelectError"></span>
+                </div>
+
+                <!-- 2. Select Property -->
+                <div class="form-group">
+                  <label for="assignPropertySelect">
+                    Select Property <span class="required">*</span>
+                  </label>
+                  <select id="assignPropertySelect" class="form-control" required>
+                    <option value="">-- Choose Property --</option>
+                  </select>
+                  <span class="form-hint">Choose destination building/complex</span>
+                  <span class="form-error-feedback" id="assignPropertySelectError"></span>
+                </div>
+
+                <!-- 3. Select Available Room -->
+                <div class="form-group">
+                  <label for="assignRoomSelect">
+                    Select Available Room <span class="required">*</span>
+                  </label>
+                  <select id="assignRoomSelect" class="form-control" disabled required>
+                    <option value="">-- Select Property First --</option>
+                  </select>
+                  <span class="form-hint">Lists strictly vacant rooms for chosen property</span>
+                  <span class="form-error-feedback" id="assignRoomSelectError"></span>
+                </div>
+
+                <!-- Selected Property Information Preview Box -->
+                <div class="form-group col-span-2">
+                  <div class="property-info-box" id="assignPropertyInfoBox">
+                    <!-- Dynamic preview loaded by tenants.js -->
+                  </div>
+                </div>
+
+                <!-- 4. Joining Date -->
+                <div class="form-group">
+                  <label for="assignMoveInDate">
+                    Effective Assignment Date <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="date" 
+                    id="assignMoveInDate" 
+                    class="form-control" 
+                    required
+                  >
+                  <span class="form-hint">Date occupancy takes effect</span>
+                  <span class="form-error-feedback" id="assignMoveInDateError"></span>
+                </div>
+
+                <!-- 5. Monthly Rent -->
+                <div class="form-group">
+                  <label for="assignMonthlyRent">
+                    Monthly Rent (₹) <span class="required">*</span>
+                  </label>
+                  <input 
+                    type="number" 
+                    id="assignMonthlyRent" 
+                    class="form-control" 
+                    min="0" 
+                    step="100" 
+                    placeholder="e.g. 8500"
+                    required
+                  >
+                  <span class="form-hint">Auto-populated from selected room rate</span>
+                  <span class="form-error-feedback" id="assignMonthlyRentError"></span>
+                </div>
+
+              </div>
+
+              <!-- Action Buttons -->
+              <div class="form-actions">
+                <a href="tenants.html" class="btn btn-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary" id="assignRoomBtn">
+                  🔑 Complete Room Assignment
+                </button>
+              </div>
+
+            </form>
+
+          </div>
+
+        </div>
+      </main>
+
+    </div>
+
+  </div>
+
+  <!-- ==========================================
+       MODAL: ASSIGNMENT CONFIRMATION DIALOG
+       ========================================== -->
+  <div class="modal-overlay" id="assignConfirmModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Confirm Room Allocation</h3>
+        <button class="modal-close-btn" title="Close Modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 12px; font-size: 0.95rem;">
+          Please confirm the following room assignment:
+        </p>
+        <div style="padding: 14px 18px; background-color: var(--ivory-card); border-radius: var(--radius-sm); border: 1.5px solid var(--sand); margin-bottom: 16px; font-size: 0.95rem; line-height: 1.6;" id="assignmentPromptDetails">
+          <!-- Populated by tenants.js -->
+        </div>
+        <p style="font-size: 0.85rem; color: var(--slate-muted);">
+          ℹ️ The assigned room status will change to <strong>'Occupied'</strong> in real time.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-cancel-btn">Cancel</button>
+        <button class="btn btn-primary" id="confirmAssignmentBtn">Yes, Confirm Assignment</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shweta's Module JavaScript -->
+  <script src="../shared/security.js"></script>
+  <script src="tenants.js"></script>
+</body>
+</html>

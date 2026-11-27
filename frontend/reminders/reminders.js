@@ -5,8 +5,8 @@
  * 
  * Features:
  * - Pure Vanilla JavaScript (No React, Vue, or Angular)
- * - Full Core Java HTTP Backend API Integration (RentProofServer on port 8080)
- * - Live MySQL Persistence (CRUD via JDBC PreparedStatement)
+ * - Reminder records read and written through the authenticated backend
+ * - Synchronized with MySQL 'reminders' and 'tenants' schema
  * - Real-time dynamic search by title, tenant name, message, and type
  * - Filter tabs: All, Pending, Upcoming, Overdue, Completed, Maintenance
  * - Live statistical calculations (Total, Pending, Completed, Upcoming, Overdue)
@@ -17,10 +17,8 @@
  * - Clean responsive sidebar navigation and toast feedback
  */
 
-const API_BASE = window.location.origin.includes(":8080") ? "" : "http://localhost:8080";
-
 // =============================================================================
-// SEED DATA (Strictly aligned with database/rentproof.sql for offline fallback)
+// SEED DATA (Strictly aligned with database/rentproof.sql)
 // =============================================================================
 
 const SEED_TENANTS = [
@@ -50,6 +48,7 @@ const SEED_TENANTS = [
   }
 ];
 
+// Helper to calculate dynamic dates relative to today
 function getDateOffset(days) {
   const d = new Date();
   d.setDate(d.getDate() + days);
@@ -64,7 +63,7 @@ const SEED_REMINDERS = [
     tenantName: "Rohan Verma",
     title: "Upcoming December Rent Due",
     message: "Friendly reminder: Monthly rent of ₹8,500 for Sunrise PG (Room 101) is due on 5th Dec. Please pay via UPI or Bank Transfer.",
-    dueDate: getDateOffset(4),
+    dueDate: getDateOffset(4), // Upcoming in 4 days
     reminderType: "Rent Due",
     reminderStatus: "Pending",
     createdAt: "2026-11-01 10:00:00"
@@ -72,32 +71,104 @@ const SEED_REMINDERS = [
   {
     reminderId: 2,
     landlordId: 1,
-    tenantId: null,
+    tenantId: null, // Property-wide
     tenantName: null,
     title: "Bi-annual Fire Extinguisher Inspection",
     message: "Inspect all fire safety cylinders, smoke sensors, and emergency exits across Sunrise PG & Ivory Heights.",
-    dueDate: getDateOffset(12),
+    dueDate: getDateOffset(12), // Upcoming in 12 days
     reminderType: "Maintenance",
     reminderStatus: "Pending",
     createdAt: "2026-11-02 11:30:00"
+  },
+  {
+    reminderId: 3,
+    landlordId: 1,
+    tenantId: 2,
+    tenantName: "Ankit Mishra",
+    title: "AC Servicing Fee Pending",
+    message: "Reminder: Shared quarterly air conditioning servicing fee of ₹650 for Room 102 is pending.",
+    dueDate: getDateOffset(-6), // Overdue by 6 days
+    reminderType: "Maintenance",
+    reminderStatus: "Pending",
+    createdAt: "2026-11-03 14:15:00"
+  },
+  {
+    reminderId: 4,
+    landlordId: 1,
+    tenantId: 3,
+    tenantName: "Sneha Kapoor",
+    title: "November Rental Receipt Recorded",
+    message: "Monthly rental of ₹28,000 for Ivory Heights Flat 702 received via UPI. Tax invoice issued.",
+    dueDate: getDateOffset(-15),
+    reminderType: "Rent Due",
+    reminderStatus: "Completed",
+    createdAt: "2026-11-02 16:45:00"
+  },
+  {
+    reminderId: 5,
+    landlordId: 1,
+    tenantId: 1,
+    tenantName: "Rohan Verma",
+    title: "Sub-meter Electricity Bill Notice",
+    message: "Sub-meter reading for October: 74 units @ ₹8/unit = ₹592. Kindly clear along with upcoming rental.",
+    dueDate: getDateOffset(2), // Upcoming in 2 days
+    reminderType: "General",
+    reminderStatus: "Pending",
+    createdAt: "2026-11-12 09:20:00"
   }
 ];
 
-// Active Filter State
+// Active State
 let currentTabFilter = "ALL";
 let currentSearchQuery = "";
 let currentTypeFilter = "ALL";
 let reminderToDeleteId = null;
-let liveRemindersCache = [];
 
 // =============================================================================
 // INITIALIZATION ON DOM READY
 // =============================================================================
 
-document.addEventListener("DOMContentLoaded", () => {
+let cachedReminders = [];
+let cachedTenants = [];
+
+async function syncReminderBackendData() {
+  const [remRes, tenRes] = await Promise.all([
+    fetch("/api/reminders"),
+    fetch("/api/tenants")
+  ]);
+  if (!remRes.ok || !tenRes.ok) {
+    throw new Error("Could not load reminders and tenants from the backend.");
+  }
+  const reminders = await remRes.json();
+  const tenants = await tenRes.json();
+  if (!Array.isArray(reminders) || !Array.isArray(tenants)) {
+    throw new Error("The backend returned invalid reminder data.");
+  }
+  cachedReminders = reminders;
+  cachedTenants = tenants;
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  if (!(await window.RentProofSecurity.requireSession())) return;
   setupNavigationAndSidebar();
   setupActiveUser();
+  document.addEventListener("click", handleReminderActionClick);
+  const notificationButton = document.getElementById("reminderNotificationBtn");
+  if (notificationButton) {
+    notificationButton.addEventListener("click", () => {
+      showToast("Reminder records are loaded from the backend.", "info");
+    });
+  }
 
+  // Load live reminders and tenants from MySQL
+  try {
+    await syncReminderBackendData();
+  } catch (error) {
+    console.error("[ReminderUI] Could not load reminder data:", error);
+    showToast(error.message || "Could not load reminder records.", "error");
+  }
+
+  // Route page actions based on active element
   if (document.getElementById("remindersTableBody")) {
     initRemindersDashboard();
   } else if (document.getElementById("addReminderForm")) {
@@ -107,63 +178,65 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// =============================================================================
-// DATA ACCESS LAYER: CORE JAVA API WITH LOCALSTORAGE FALLBACK
-// =============================================================================
+function handleReminderActionClick(event) {
+  const button = event.target.closest("[data-reminder-action]");
+  if (!button) return;
 
-async function fetchRemindersFromBackend(search = "", type = "", status = "") {
-  try {
-    const params = new URLSearchParams();
-    if (search) params.append("search", search);
-    if (type && type !== "ALL") params.append("type", type);
-    if (status && status !== "ALL") params.append("status", status);
-
-    const res = await fetch(`${API_BASE}/api/reminders?${params.toString()}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    liveRemindersCache = data;
-    localStorage.setItem("rentproof_reminders", JSON.stringify(data));
-    return data;
-  } catch (err) {
-    console.warn("[Reminders] Backend API fetch failed, falling back to local storage:", err.message);
-    const stored = localStorage.getItem("rentproof_reminders");
-    if (stored) {
-      try {
-        liveRemindersCache = JSON.parse(stored);
-        return liveRemindersCache;
-      } catch (e) {}
-    }
-    liveRemindersCache = [...SEED_REMINDERS];
-    return liveRemindersCache;
+  const reminderId = Number(button.dataset.reminderId);
+  switch (button.dataset.reminderAction) {
+    case "toggle":
+      toggleReminderStatus(reminderId);
+      break;
+    case "send":
+      openSendNoticeModal(reminderId);
+      break;
+    case "view":
+      openViewModal(reminderId);
+      break;
+    case "delete":
+      openDeleteModal(reminderId);
+      break;
+    case "close-view":
+      closeViewModal();
+      break;
+    case "close-delete":
+      closeDeleteModal();
+      break;
+    case "confirm-delete":
+      confirmExecuteDelete();
+      break;
+    case "close-notice":
+      closeSendNoticeModal();
+      break;
   }
 }
 
-async function fetchTenantsFromBackend() {
-  try {
-    const res = await fetch(`${API_BASE}/api/tenants`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    localStorage.setItem("rentproof_tenants", JSON.stringify(data));
-    return data;
-  } catch (err) {
-    console.warn("[Reminders] Tenants API failed, using fallback:", err.message);
-    const stored = localStorage.getItem("rentproof_tenants");
-    if (stored) {
-      try { return JSON.parse(stored); } catch (e) {}
-    }
-    return [...SEED_TENANTS];
-  }
+// =============================================================================
+// DATA ACCESS LAYER (Live MySQL via Core Java REST endpoints)
+// =============================================================================
+
+function getReminders() {
+  return cachedReminders;
+}
+
+function saveReminders(reminders) {
+  cachedReminders = reminders;
+}
+
+function getTenants() {
+  return cachedTenants;
 }
 
 function getActivities() {
   const stored = localStorage.getItem("rentproof_reminder_activities");
   if (stored) {
-    try { return JSON.parse(stored); } catch (e) {}
+    try {
+      return JSON.parse(stored);
+    } catch (e) {
+      console.error("Error parsing activities:", e);
+    }
   }
-  return [
-    { id: 1, icon: "🔔", text: "Created reminder <strong>'Upcoming December Rent Due'</strong> for <strong>Rohan Verma</strong>", time: "2 hours ago" },
-    { id: 2, icon: "🔧", text: "Scheduled <strong>'Fire Extinguisher Inspection'</strong> for property", time: "Yesterday" }
-  ];
+  return [];
 }
 
 function logActivity(icon, text) {
@@ -174,7 +247,9 @@ function logActivity(icon, text) {
     text: text,
     time: "Just now"
   });
-  if (activities.length > 8) activities.pop();
+  if (activities.length > 8) {
+    activities.pop();
+  }
   localStorage.setItem("rentproof_reminder_activities", JSON.stringify(activities));
   renderActivityFeed();
 }
@@ -183,20 +258,21 @@ function logActivity(icon, text) {
 // DASHBOARD LOGIC (reminders.html)
 // =============================================================================
 
-async function initRemindersDashboard() {
-  setupDashboardEventListeners();
-  await loadAndRenderReminders();
+function initRemindersDashboard() {
+  renderStats();
+  renderRemindersTable();
   renderActivityFeed();
+  setupDashboardEventListeners();
 }
 
 function setupDashboardEventListeners() {
   // Tab pills
   document.querySelectorAll(".tab-pill").forEach(pill => {
-    pill.addEventListener("click", () => {
+    pill.addEventListener("click", (e) => {
       document.querySelectorAll(".tab-pill").forEach(p => p.classList.remove("active"));
       pill.classList.add("active");
       currentTabFilter = pill.getAttribute("data-tab");
-      renderRemindersTable(liveRemindersCache);
+      renderRemindersTable();
     });
   });
 
@@ -217,13 +293,9 @@ function setupDashboardEventListeners() {
   // Search input
   const searchInput = document.getElementById("reminderSearchInput");
   if (searchInput) {
-    let debounceTimer;
     searchInput.addEventListener("input", (e) => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        currentSearchQuery = e.target.value.trim();
-        loadAndRenderReminders();
-      }, 250);
+      currentSearchQuery = e.target.value.trim().toLowerCase();
+      renderRemindersTable();
     });
   }
 
@@ -232,21 +304,16 @@ function setupDashboardEventListeners() {
   if (typeFilter) {
     typeFilter.addEventListener("change", (e) => {
       currentTypeFilter = e.target.value;
-      loadAndRenderReminders();
+      renderRemindersTable();
     });
   }
-}
-
-async function loadAndRenderReminders() {
-  const reminders = await fetchRemindersFromBackend(currentSearchQuery, currentTypeFilter);
-  renderStats(reminders);
-  renderRemindersTable(reminders);
 }
 
 /**
  * Calculates and updates the 5 metric cards on the dashboard.
  */
-function renderStats(reminders) {
+function renderStats() {
+  const reminders = getReminders();
   const today = new Date().toISOString().split("T")[0];
 
   let total = reminders.length;
@@ -264,6 +331,7 @@ function renderStats(reminders) {
       if (r.dueDate < today) {
         overdue++;
       } else {
+        // Check if within 7 days
         const diffDays = getDaysDifference(today, r.dueDate);
         if (diffDays >= 0 && diffDays <= 7) {
           upcoming++;
@@ -272,23 +340,31 @@ function renderStats(reminders) {
     }
   });
 
-  setText("statTotalReminders", total);
-  setText("statPendingReminders", pending);
-  setText("statCompletedReminders", completed);
-  setText("statUpcomingReminders", upcoming);
-  setText("statOverdueReminders", overdue);
+  document.getElementById("statTotalReminders").textContent = total;
+  document.getElementById("statPendingReminders").textContent = pending;
+  document.getElementById("statCompletedReminders").textContent = completed;
+  document.getElementById("statUpcomingReminders").textContent = upcoming;
+  document.getElementById("statOverdueReminders").textContent = overdue;
 
-  setText("badgeTabAll", total);
-  setText("badgeTabPending", pending);
-  setText("badgeTabUpcoming", upcoming);
-  setText("badgeTabOverdue", overdue);
-  setText("badgeTabCompleted", completed);
+  // Update tab badge counters
+  const badgeAll = document.getElementById("badgeTabAll");
+  const badgePending = document.getElementById("badgeTabPending");
+  const badgeUpcoming = document.getElementById("badgeTabUpcoming");
+  const badgeOverdue = document.getElementById("badgeTabOverdue");
+  const badgeCompleted = document.getElementById("badgeTabCompleted");
+
+  if (badgeAll) badgeAll.textContent = total;
+  if (badgePending) badgePending.textContent = pending;
+  if (badgeUpcoming) badgeUpcoming.textContent = upcoming;
+  if (badgeOverdue) badgeOverdue.textContent = overdue;
+  if (badgeCompleted) badgeCompleted.textContent = completed;
 }
 
 /**
  * Renders the filtered and searched reminders in the dashboard table.
  */
-function renderRemindersTable(reminders) {
+function renderRemindersTable() {
+  const reminders = getReminders();
   const tableBody = document.getElementById("remindersTableBody");
   const emptyState = document.getElementById("emptyStateBox");
   const tableCard = document.getElementById("remindersTableCard");
@@ -313,6 +389,22 @@ function renderRemindersTable(reminders) {
     // Type filter
     if (currentTypeFilter !== "ALL" && r.reminderType !== currentTypeFilter) return false;
 
+    // Search query
+    if (currentSearchQuery) {
+      const tenantStr = (r.tenantName || "All Tenants General").toLowerCase();
+      const titleStr = (r.title || "").toLowerCase();
+      const msgStr = (r.message || "").toLowerCase();
+      const typeStr = (r.reminderType || "").toLowerCase();
+      const statusStr = (r.reminderStatus || "").toLowerCase();
+
+      const matches = tenantStr.includes(currentSearchQuery) ||
+        titleStr.includes(currentSearchQuery) ||
+        msgStr.includes(currentSearchQuery) ||
+        typeStr.includes(currentSearchQuery) ||
+        statusStr.includes(currentSearchQuery);
+      if (!matches) return false;
+    }
+
     return true;
   });
 
@@ -323,6 +415,7 @@ function renderRemindersTable(reminders) {
     return b.reminderId - a.reminderId;
   });
 
+  // Update table row count indicator
   const countIndicator = document.getElementById("tableCountIndicator");
   if (countIndicator) {
     countIndicator.textContent = `Showing ${filtered.length} of ${reminders.length}`;
@@ -338,11 +431,13 @@ function renderRemindersTable(reminders) {
   if (emptyState) emptyState.style.display = "none";
   if (tableCard) tableCard.style.display = "block";
 
+  // Build rows HTML
   tableBody.innerHTML = filtered.map(r => {
     const isComp = (r.reminderStatus === "Completed" || r.reminderStatus === "Resolved");
     const isOverdue = !isComp && (r.dueDate < today);
     const diffDays = getDaysDifference(today, r.dueDate);
 
+    // Due countdown string
     let countdownBadge = "";
     if (isComp) {
       countdownBadge = `<span class="due-countdown-tag completed">✓ Resolved</span>`;
@@ -357,6 +452,7 @@ function renderRemindersTable(reminders) {
       countdownBadge = `<span class="due-countdown-tag upcoming">🗓️ Due in ${diffDays} days</span>`;
     }
 
+    // Type badge class
     let typeClass = "general";
     let typeIcon = "📌";
     if (r.reminderType === "Rent Due") {
@@ -370,6 +466,7 @@ function renderRemindersTable(reminders) {
       typeIcon = "📑";
     }
 
+    // Status badge
     let statusBadge = "";
     if (isComp) {
       statusBadge = `<span class="status-badge completed">● Completed</span>`;
@@ -381,10 +478,13 @@ function renderRemindersTable(reminders) {
       statusBadge = `<span class="status-badge pending">● Pending</span>`;
     }
 
+    // Tenant initials
+    const tenantInitials = r.tenantName ? getInitials(r.tenantName) : "🏢";
     const tenantDisplay = r.tenantName ? r.tenantName : "General Property";
     const tenantSub = r.tenantName ? "Assigned Tenant" : "All Residents / Building";
-    const tenantInitials = r.tenantName ? getInitials(r.tenantName) : "🏢";
     const avatarClass = r.tenantName ? "" : "general";
+
+    // Row class
     const rowClass = isOverdue ? "row-overdue" : (isComp ? "row-completed" : "");
 
     return `
@@ -414,33 +514,42 @@ function renderRemindersTable(reminders) {
         <td>
           <span class="type-badge ${typeClass}">${typeIcon} ${escapeHtml(r.reminderType)}</span>
         </td>
-        <td>${statusBadge}</td>
+        <td>
+          ${statusBadge}
+        </td>
         <td>
           <div class="table-actions-cell">
+            <!-- Mark Complete / Reopen -->
             <button 
               class="action-btn btn-complete" 
               title="${isComp ? 'Reopen (Mark as Pending)' : 'Mark as Completed'}" 
-              onclick="toggleReminderStatus(${r.reminderId})"
+              data-reminder-action="toggle"
+              data-reminder-id="${r.reminderId}"
             >
               ${isComp ? '↩️' : '✓'}
             </button>
 
+            <!-- Send Notification Simulation -->
             <button 
               class="action-btn btn-send" 
               title="Dispatch Notice to Tenant" 
-              onclick="openSendNoticeModal(${r.reminderId})"
+              data-reminder-action="send"
+              data-reminder-id="${r.reminderId}"
             >
               📤
             </button>
 
+            <!-- View Details -->
             <button 
               class="action-btn" 
               title="View Full Details" 
-              onclick="openViewModal(${r.reminderId})"
+              data-reminder-action="view"
+              data-reminder-id="${r.reminderId}"
             >
               👁️
             </button>
 
+            <!-- Edit Reminder -->
             <a 
               href="edit-reminder.html?id=${r.reminderId}" 
               class="action-btn btn-edit" 
@@ -450,10 +559,12 @@ function renderRemindersTable(reminders) {
               ✏️
             </a>
 
+            <!-- Delete Reminder -->
             <button 
               class="action-btn btn-delete" 
               title="Delete Reminder" 
-              onclick="openDeleteModal(${r.reminderId})"
+              data-reminder-action="delete"
+              data-reminder-id="${r.reminderId}"
             >
               🗑️
             </button>
@@ -465,71 +576,58 @@ function renderRemindersTable(reminders) {
 }
 
 /**
- * Toggles a reminder between Pending and Completed directly in MySQL via /api/reminders/update-status.
+ * Toggles a reminder between Pending and Completed.
  */
 async function toggleReminderStatus(id) {
-  const reminder = liveRemindersCache.find(r => r.reminderId === id);
-  if (!reminder) return;
-
-  const wasCompleted = (reminder.reminderStatus === "Completed" || reminder.reminderStatus === "Resolved");
-  const newStatus = wasCompleted ? "Pending" : "Completed";
-
   try {
-    const res = await fetch(`${API_BASE}/api/reminders/update-status`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reminderId: id, reminderStatus: newStatus })
-    });
-    if (!res.ok) throw new Error("Status update failed");
-
-    reminder.reminderStatus = newStatus;
-    showToast(`Reminder #REM-${id} marked as ${newStatus}!`, "success");
-    logActivity(
-      wasCompleted ? "↩️" : "✅",
-      `Reminder <strong>'${escapeHtml(reminder.title)}'</strong> changed to ${newStatus}.`
-    );
-  } catch (err) {
-    reminder.reminderStatus = newStatus;
-    showToast(`Reminder #REM-${id} updated (${newStatus}).`, "info");
-  }
-
-  renderStats(liveRemindersCache);
-  renderRemindersTable(liveRemindersCache);
-}
-
-/**
- * Deletes a reminder in MySQL via /api/reminders/delete.
- */
-async function confirmExecuteDelete() {
-  if (!reminderToDeleteId) return;
-
-  const id = reminderToDeleteId;
-  const deletedItem = liveRemindersCache.find(r => r.reminderId === id);
-
-  try {
-    const res = await fetch(`${API_BASE}/api/reminders/delete`, {
+    const res = await fetch("/api/reminders/toggle-status", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reminderId: id })
     });
-    if (!res.ok) throw new Error("Delete failed");
+    const data = await res.json();
+    if (res.ok && data.success) {
+      await syncReminderBackendData();
+      renderStats();
+      renderRemindersTable();
 
-    liveRemindersCache = liveRemindersCache.filter(r => r.reminderId !== id);
-    localStorage.setItem("rentproof_reminders", JSON.stringify(liveRemindersCache));
-    showToast(`Reminder #REM-${id} deleted successfully from MySQL.`, "danger");
+      const newStatus = data.newStatus;
+      const isCompleted = newStatus === "Completed";
+      logActivity(
+        isCompleted ? "✅" : "↩️",
+        `Reminder #${id} status updated to <strong>${newStatus}</strong> in MySQL.`
+      );
+      showToast(`Reminder #${id} marked as ${newStatus}!`, isCompleted ? "success" : "info");
+    } else {
+      showToast("Failed to toggle status: " + (data.error || "Database error"), "danger");
+    }
   } catch (err) {
-    liveRemindersCache = liveRemindersCache.filter(r => r.reminderId !== id);
-    localStorage.setItem("rentproof_reminders", JSON.stringify(liveRemindersCache));
-    showToast(`Reminder #REM-${id} deleted locally.`, "danger");
+    showToast("Server error: " + err.message, "danger");
+  }
+}
+
+/**
+ * Renders the recent activity log feed on the dashboard.
+ */
+function renderActivityFeed() {
+  const container = document.getElementById("activityFeedContainer");
+  if (!container) return;
+
+  const activities = getActivities();
+  if (activities.length === 0) {
+    container.innerHTML = `<p style="font-size: 0.85rem; color: var(--slate-muted);">No recent reminder activities logged yet.</p>`;
+    return;
   }
 
-  if (deletedItem) {
-    logActivity("🗑️", `Deleted reminder <strong>'${escapeHtml(deletedItem.title)}'</strong>`);
-  }
-
-  closeDeleteModal();
-  renderStats(liveRemindersCache);
-  renderRemindersTable(liveRemindersCache);
+  container.innerHTML = activities.map(act => `
+    <div class="activity-item">
+      <div class="activity-item-icon">${act.icon}</div>
+      <div class="activity-item-details">
+        <div class="activity-item-text">${act.text}</div>
+        <div class="activity-item-time">${act.time}</div>
+      </div>
+    </div>
+  `).join("");
 }
 
 // =============================================================================
@@ -537,7 +635,8 @@ async function confirmExecuteDelete() {
 // =============================================================================
 
 function openViewModal(id) {
-  const r = liveRemindersCache.find(item => item.reminderId === id);
+  const reminders = getReminders();
+  const r = reminders.find(item => item.reminderId === id);
   if (!r) return;
 
   const modalBody = document.getElementById("viewModalBody");
@@ -590,7 +689,8 @@ function closeViewModal() {
 
 function openDeleteModal(id) {
   reminderToDeleteId = id;
-  const r = liveRemindersCache.find(item => item.reminderId === id);
+  const reminders = getReminders();
+  const r = reminders.find(item => item.reminderId === id);
   const targetLabel = document.getElementById("deleteReminderTitleTarget");
   if (targetLabel && r) {
     targetLabel.textContent = `"${r.title}" (#REM-${r.reminderId})`;
@@ -604,11 +704,46 @@ function closeDeleteModal() {
   if (modal) modal.classList.remove("active");
 }
 
+async function confirmExecuteDelete() {
+  if (!reminderToDeleteId) return;
+
+  try {
+    const res = await fetch("/api/reminders/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reminderId: reminderToDeleteId })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      logActivity("🗑️", `Deleted reminder #${reminderToDeleteId} from MySQL.`);
+      closeDeleteModal();
+      await syncReminderBackendData();
+      renderStats();
+      renderRemindersTable();
+      showToast(`Reminder #${reminderToDeleteId} deleted successfully from database.`, "danger");
+    } else {
+      showToast("Failed to delete reminder: " + (data.error || "Database error"), "danger");
+    }
+  } catch (err) {
+    showToast("Server error: " + err.message, "danger");
+  }
+}
+
+/**
+ * Dispatch Notice Simulation Modal
+ */
 function openSendNoticeModal(id) {
-  const r = liveRemindersCache.find(item => item.reminderId === id);
+  const reminders = getReminders();
+  const r = reminders.find(item => item.reminderId === id);
   if (!r) return;
 
-  const recipientName = r.tenantName || "All Tenants";
+  const tenants = getTenants();
+  const tenant = tenants.find(t => t.tenantId === r.tenantId);
+
+  const recipientPhone = tenant ? tenant.phone : "Property Residents Broadcast";
+  const recipientEmail = tenant ? tenant.email : "tenants@rentproof.com";
+  const recipientName = tenant ? tenant.fullName : (r.tenantName || "All Tenants");
+
   const bodyEl = document.getElementById("sendNoticeModalBody");
   if (bodyEl) {
     bodyEl.innerHTML = `
@@ -630,29 +765,27 @@ function openSendNoticeModal(id) {
             Please settle via RentProof Landlord Portal.
           </div>
         </div>
+
+        <div style="font-size: 0.8rem; color: var(--slate-muted);">
+          Recipient Contact: <strong>+91 ${escapeHtml(recipientPhone)}</strong> &bull; <strong>${escapeHtml(recipientEmail)}</strong>
+        </div>
       </div>
     `;
   }
 
+  // Bind dispatch button
   const confirmBtn = document.getElementById("confirmSendNoticeBtn");
   if (confirmBtn) {
-    confirmBtn.onclick = async () => {
-      try {
-        await fetch(`${API_BASE}/api/reminders/update-status`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reminderId: id, reminderStatus: "Sent" })
-        });
-        r.reminderStatus = "Sent";
-      } catch (e) {
-        r.reminderStatus = "Sent";
-      }
+    confirmBtn.onclick = () => {
+      // Update reminder status to Sent
+      r.reminderStatus = "Sent";
+      saveReminders(reminders);
+      renderStats();
+      renderRemindersTable();
 
       logActivity("📤", `Dispatched notification for <strong>'${escapeHtml(r.title)}'</strong> to <strong>${escapeHtml(recipientName)}</strong>`);
       closeSendNoticeModal();
       showToast(`Notice sent successfully to ${recipientName}!`, "info");
-      renderStats(liveRemindersCache);
-      renderRemindersTable(liveRemindersCache);
     };
   }
 
@@ -664,53 +797,44 @@ function closeSendNoticeModal() {
   if (modal) modal.classList.remove("active");
 }
 
-function renderActivityFeed() {
-  const container = document.getElementById("activityFeedContainer");
-  if (!container) return;
-
-  const activities = getActivities();
-  container.innerHTML = activities.map(act => `
-    <div class="activity-item">
-      <div class="activity-item-icon">${act.icon}</div>
-      <div class="activity-item-details">
-        <div class="activity-item-text">${act.text}</div>
-        <div class="activity-item-time">${act.time}</div>
-      </div>
-    </div>
-  `).join("");
-}
-
 // =============================================================================
 // ADD REMINDER PAGE (add-reminder.html)
 // =============================================================================
 
-async function initAddReminderPage() {
-  await populateTenantDropdown("reminderTenantSelect");
+function initAddReminderPage() {
+  populateTenantDropdown("reminderTenantSelect");
   setupTemplateChips();
   setupQuickDateButtons();
   setupAddFormValidation();
 }
 
-async function populateTenantDropdown(selectElementId, selectedTenantId = null) {
+/**
+ * Loads tenants dynamically from data store into <select>.
+ * Meets Requirement 5: "Do not hardcode tenant records in final implementation. Load tenants from database."
+ */
+function populateTenantDropdown(selectElementId, selectedTenantId = null) {
   const selectEl = document.getElementById(selectElementId);
   if (!selectEl) return;
 
-  const tenants = await fetchTenantsFromBackend();
+  const tenants = getTenants();
   selectEl.innerHTML = `
     <option value="">-- Select Recipient Tenant --</option>
     <option value="GENERAL" ${selectedTenantId === null ? 'selected' : ''}>🏢 Property-wide / All Tenants (General Notice)</option>
   `;
 
   tenants.forEach(t => {
-    const isSelected = (selectedTenantId && Number(selectedTenantId) === Number(t.tenantId));
+    const isSelected = (selectedTenantId && selectedTenantId === t.tenantId);
     selectEl.innerHTML += `
       <option value="${t.tenantId}" ${isSelected ? 'selected' : ''}>
-        👤 ${escapeHtml(t.fullName)} (${escapeHtml(t.propertyName || 'PG')} - Room ${escapeHtml(t.roomNumber || '')})
+        👤 ${escapeHtml(t.fullName)} (${escapeHtml(t.propertyName)} - Room ${escapeHtml(t.roomNumber)})
       </option>
     `;
   });
 }
 
+/**
+ * Handles template chip quick autofill.
+ */
 function setupTemplateChips() {
   document.querySelectorAll(".template-chip").forEach(chip => {
     chip.addEventListener("click", () => {
@@ -725,12 +849,16 @@ function setupTemplateChips() {
       if (titleInput && title) titleInput.value = title;
       if (typeSelect && type) typeSelect.value = type;
 
+      // Customize message with selected tenant name if selected
       const tenantSelect = document.getElementById("reminderTenantSelect");
       let customizedMsg = msg;
       if (tenantSelect && tenantSelect.value && tenantSelect.value !== "GENERAL") {
-        const selectedText = tenantSelect.options[tenantSelect.selectedIndex].text;
-        customizedMsg = customizedMsg.replace("{TENANT_NAME}", selectedText.split("(")[0].replace("👤", "").trim());
-        customizedMsg = customizedMsg.replace("{ROOM}", "your assigned room");
+        const tenants = getTenants();
+        const t = tenants.find(item => item.tenantId == tenantSelect.value);
+        if (t) {
+          customizedMsg = customizedMsg.replace("{TENANT_NAME}", t.fullName);
+          customizedMsg = customizedMsg.replace("{ROOM}", t.roomNumber);
+        }
       } else {
         customizedMsg = customizedMsg.replace("{TENANT_NAME}", "Resident");
         customizedMsg = customizedMsg.replace("{ROOM}", "your assigned room");
@@ -741,11 +869,14 @@ function setupTemplateChips() {
   });
 }
 
+/**
+ * Handles quick date shortcuts ("Tomorrow", "In 3 Days", "1st of Next Month").
+ */
 function setupQuickDateButtons() {
   document.querySelectorAll(".date-btn").forEach(btn => {
     btn.addEventListener("click", () => {
       const days = parseInt(btn.getAttribute("data-offset-days"), 10);
-      const dateInput = document.getElementById("reminderDueDate") || document.getElementById("editReminderDueDate");
+      const dateInput = document.getElementById("reminderDueDate");
       if (!dateInput) return;
 
       if (btn.getAttribute("data-first-next-month") === "true") {
@@ -759,10 +890,14 @@ function setupQuickDateButtons() {
   });
 }
 
+/**
+ * Validates and saves a new reminder.
+ */
 function setupAddFormValidation() {
   const form = document.getElementById("addReminderForm");
   if (!form) return;
 
+  // Set default due date to 5 days ahead
   const dateInput = document.getElementById("reminderDueDate");
   if (dateInput && !dateInput.value) {
     dateInput.value = getDateOffset(5);
@@ -778,6 +913,7 @@ function setupAddFormValidation() {
     const statusVal = document.querySelector('input[name="reminderStatus"]:checked')?.value || "Pending";
     const messageVal = document.getElementById("reminderMessage").value.trim();
 
+    // Reset previous errors
     clearFormErrors();
     let hasError = false;
 
@@ -785,28 +921,44 @@ function setupAddFormValidation() {
       showFieldError("reminderTenantError", "Please select a recipient tenant or choose General Property-wide.");
       hasError = true;
     }
-    if (!titleVal || titleVal.length < 3) {
+
+    if (!titleVal) {
+      showFieldError("reminderTitleError", "Reminder title is required.");
+      hasError = true;
+    } else if (titleVal.length < 3) {
       showFieldError("reminderTitleError", "Reminder title must be at least 3 characters long.");
       hasError = true;
+    } else if (titleVal.length > 150) {
+      showFieldError("reminderTitleError", "Reminder title cannot exceed 150 characters.");
+      hasError = true;
     }
+
     if (!typeVal) {
       showFieldError("reminderTypeError", "Please select a reminder category.");
       hasError = true;
     }
+
     if (!dueDateVal) {
       showFieldError("reminderDueDateError", "Due date is required.");
       hasError = true;
     }
-    if (!messageVal || messageVal.length < 5) {
+
+    if (!messageVal) {
+      showFieldError("reminderMessageError", "Reminder message is required.");
+      hasError = true;
+    } else if (messageVal.length < 5) {
       showFieldError("reminderMessageError", "Reminder message must be at least 5 characters long.");
       hasError = true;
     }
 
     if (hasError) return;
 
+    const user = JSON.parse(localStorage.getItem("rentproof_user")) || { landlordId: 1 };
+    let tenantId = (tenantVal !== "GENERAL") ? parseInt(tenantVal, 10) : 0;
+
     const payload = {
-      landlordId: 1,
-      tenantId: (tenantVal === "GENERAL" ? null : tenantVal),
+      landlordId: user.landlordId || 1,
+      tenantId: tenantId,
       title: titleVal,
       message: messageVal,
       dueDate: dueDateVal,
@@ -816,34 +968,33 @@ function setupAddFormValidation() {
 
     const submitBtn = document.getElementById("submitReminderBtn");
     if (submitBtn) {
-      submitBtn.textContent = "⏳ Persisting to MySQL...";
       submitBtn.disabled = true;
+      submitBtn.textContent = "Saving to Database...";
     }
 
     try {
-      const res = await fetch(`${API_BASE}/api/reminders/add`, {
+      const res = await fetch("/api/reminders/add", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
       const data = await res.json();
-      if (!res.ok || data.success === false) {
-        throw new Error(data.error || "Failed to add reminder");
+      if (res.ok && data.success) {
+        logActivity("➕", `Created new reminder <strong>'${escapeHtml(titleVal)}'</strong> in MySQL.`);
+        window.location.href = "reminders.html?created=true";
+      } else {
+        alert("Error creating reminder: " + (data.error || "Database error"));
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "💾 Create Reminder";
+        }
       }
-      logActivity("➕", `Created new reminder <strong>'${escapeHtml(titleVal)}'</strong> in MySQL`);
-      window.location.href = "reminders.html?created=true";
     } catch (err) {
-      console.warn("Backend insert failed, falling back to local storage:", err.message);
-      const stored = localStorage.getItem("rentproof_reminders");
-      const reminders = stored ? JSON.parse(stored) : [...SEED_REMINDERS];
-      const newId = reminders.length > 0 ? Math.max(...reminders.map(r => r.reminderId)) + 1 : 1;
-      reminders.push({
-        reminderId: newId,
-        ...payload,
-        createdAt: new Date().toISOString().replace("T", " ").substring(0, 19)
-      });
-      localStorage.setItem("rentproof_reminders", JSON.stringify(reminders));
-      window.location.href = "reminders.html?created=true";
+      alert("Server communication error: " + err.message);
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "💾 Create Reminder";
+      }
     }
   });
 }
@@ -852,7 +1003,7 @@ function setupAddFormValidation() {
 // EDIT REMINDER PAGE (edit-reminder.html)
 // =============================================================================
 
-async function initEditReminderPage() {
+function initEditReminderPage() {
   const urlParams = new URLSearchParams(window.location.search);
   const reminderId = parseInt(urlParams.get("id"), 10);
 
@@ -862,42 +1013,36 @@ async function initEditReminderPage() {
     return;
   }
 
-  let reminder = null;
-  try {
-    const res = await fetch(`${API_BASE}/api/reminders/get?id=${reminderId}`);
-    if (res.ok) {
-      reminder = await res.json();
-    }
-  } catch (e) {}
+  const reminders = getReminders();
+  const reminder = reminders.find(r => r.reminderId === reminderId);
 
   if (!reminder) {
-    const stored = localStorage.getItem("rentproof_reminders");
-    const reminders = stored ? JSON.parse(stored) : SEED_REMINDERS;
-    reminder = reminders.find(r => r.reminderId === reminderId);
-  }
-
-  if (!reminder) {
-    alert(`Reminder #REM-${reminderId} not found.`);
+    alert(`Reminder #REM-${reminderId} not found. Redirecting.`);
     window.location.href = "reminders.html";
     return;
   }
 
+  // Pre-fill form fields
   document.getElementById("editReminderIdDisplay").textContent = `#REM-${reminder.reminderId}`;
-  await populateTenantDropdown("editReminderTenantSelect", reminder.tenantId);
+  populateTenantDropdown("editReminderTenantSelect", reminder.tenantId);
 
   document.getElementById("editReminderTitle").value = reminder.title;
   document.getElementById("editReminderType").value = reminder.reminderType;
   document.getElementById("editReminderDueDate").value = reminder.dueDate;
   document.getElementById("editReminderMessage").value = reminder.message;
 
+  // Set radio status
   const statusRadio = document.querySelector(`input[name="editReminderStatus"][value="${reminder.reminderStatus}"]`);
-  if (statusRadio) statusRadio.checked = true;
+  if (statusRadio) {
+    statusRadio.checked = true;
+  }
 
   setupQuickDateButtons();
 
+  // Form submit handler
   const form = document.getElementById("editReminderForm");
   if (form) {
-    form.addEventListener("submit", async (e) => {
+    form.addEventListener("submit", (e) => {
       e.preventDefault();
 
       const tenantVal = document.getElementById("editReminderTenantSelect").value;
@@ -925,36 +1070,57 @@ async function initEditReminderPage() {
 
       if (hasError) return;
 
+      const user = JSON.parse(localStorage.getItem("rentproof_user")) || { landlordId: 1 };
+      let tenantId = (tenantVal !== "GENERAL") ? parseInt(tenantVal, 10) : 0;
+
       const payload = {
-        reminderId: reminder.reminderId,
-        landlordId: 1,
-        tenantId: (tenantVal === "GENERAL" ? null : tenantVal),
+        reminderId: reminderId,
+        landlordId: user.landlordId || 1,
+        tenantId: tenantId,
         title: titleVal,
-        message: messageVal,
-        dueDate: dueDateVal,
         reminderType: typeVal,
-        reminderStatus: statusVal
+        dueDate: dueDateVal,
+        reminderStatus: statusVal,
+        message: messageVal
       };
 
-      try {
-        const res = await fetch(`${API_BASE}/api/reminders/update`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) throw new Error("Update failed");
-      } catch (e) {
-        // Fallback
+      const submitBtn = form.querySelector("button[type='submit']");
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "Updating in Database...";
       }
 
-      logActivity("✏️", `Updated reminder <strong>'${escapeHtml(titleVal)}'</strong> in MySQL`);
-      window.location.href = "reminders.html?updated=true";
+      fetch("/api/reminders/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+        .then(async (res) => {
+          const data = await res.json();
+          if (res.ok && data.success) {
+            logActivity("✏️", `Updated reminder <strong>'${escapeHtml(titleVal)}'</strong> in MySQL.`);
+            window.location.href = "reminders.html?updated=true";
+          } else {
+            alert("Error updating reminder: " + (data.error || "Database error"));
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = "💾 Update Reminder";
+            }
+          }
+        })
+        .catch((err) => {
+          alert("Server error: " + err.message);
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = "💾 Update Reminder";
+          }
+        });
     });
   }
 }
 
 // =============================================================================
-// SHARED UTILITY HELPERS
+// SHARED NAVIGATION & UTILITY HELPERS
 // =============================================================================
 
 function setupNavigationAndSidebar() {
@@ -962,18 +1128,25 @@ function setupNavigationAndSidebar() {
   const sidebar = document.getElementById("appSidebar");
 
   if (toggleBtn && sidebar) {
+    // Restore sidebar preference
     const isCollapsed = localStorage.getItem("rentproof_sidebar_collapsed") === "true";
-    if (isCollapsed) sidebar.classList.add("collapsed");
+    if (isCollapsed) {
+      sidebar.classList.add("collapsed");
+    }
 
     toggleBtn.addEventListener("click", () => {
       sidebar.classList.toggle("collapsed");
-      localStorage.setItem("rentproof_sidebar_collapsed", sidebar.classList.contains("collapsed") ? "true" : "false");
+      localStorage.setItem(
+        "rentproof_sidebar_collapsed",
+        sidebar.classList.contains("collapsed") ? "true" : "false"
+      );
     });
   }
 
+  // Check URL query parameters for feedback toast
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get("created") === "true") {
-    showToast("New reminder created and persisted to MySQL!", "success");
+    showToast("New reminder created successfully!", "success");
     cleanUrl();
   } else if (urlParams.get("updated") === "true") {
     showToast("Reminder updated successfully!", "success");
@@ -996,7 +1169,7 @@ function setupActiveUser() {
 }
 
 function showModuleNotice(moduleName, leadName) {
-  alert(`RentProof Team Module Notice:\n\n${moduleName}\nModule Lead: ${leadName}\n\nMaintained independently by assigned team members.`);
+  alert(`RentProof Team Module Notice:\n\n${moduleName}\nModule Lead: ${leadName}\n\nThis module is maintained independently by team members.`);
 }
 
 function showFieldError(elementId, message) {
@@ -1037,14 +1210,17 @@ function showToast(message, type = "info") {
 
 function getInitials(name) {
   if (!name) return "RP";
-  return name.split(" ").map(p => p.charAt(0)).join("").toUpperCase().substring(0, 2);
+  return name.split(" ")
+    .map(p => p.charAt(0))
+    .join("")
+    .toUpperCase()
+    .substring(0, 2);
 }
 
 function formatDisplayDate(dateStr) {
   if (!dateStr) return "N/A";
   try {
     const d = new Date(dateStr + "T00:00:00");
-    if (isNaN(d.getTime())) return dateStr;
     return d.toLocaleDateString("en-US", {
       day: "numeric",
       month: "short",
@@ -1060,11 +1236,6 @@ function getDaysDifference(startDateStr, endDateStr) {
   const end = new Date(endDateStr);
   const diffTime = end.getTime() - start.getTime();
   return Math.round(diffTime / (1000 * 60 * 60 * 24));
-}
-
-function setText(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text;
 }
 
 function escapeHtml(str) {

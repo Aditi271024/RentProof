@@ -1,8 +1,13 @@
 package com.rentproof.landlord;
 
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.security.NoSuchAlgorithmException;
+import java.security.spec.InvalidKeySpecException;
+import java.util.Base64;
 import java.sql.SQLException;
 import java.util.regex.Pattern;
 
@@ -24,6 +29,10 @@ import java.util.regex.Pattern;
  * - Static helper methods
  */
 public class AuthService {
+    public static final String PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256";
+    public static final int PBKDF2_ITERATIONS = 120000;
+    public static final int HASH_BYTES = 32;
+    public static final int SALT_BYTES = 16;
 
     private final LandlordDAO landlordDAO;
 
@@ -123,8 +132,9 @@ public class AuthService {
             throw new IllegalArgumentException(validationError);
         }
 
-        // Step 2: Hash the password securely using SHA-256
-        String passwordHash = hashPassword(plainPassword);
+        // Step 2: Generate an independent salt and derive a PBKDF2 hash
+        String salt = generateSalt();
+        String passwordHash = hashPassword(plainPassword, salt, PBKDF2_ITERATIONS);
 
         // Step 3: Instantiate Landlord model
         Landlord newLandlord = new Landlord(
@@ -133,6 +143,8 @@ public class AuthService {
                 phone.trim(),
                 passwordHash
         );
+        newLandlord.setPasswordSalt(salt);
+        newLandlord.setPasswordIterations(PBKDF2_ITERATIONS);
 
         // Step 4: Persist through DAO
         int generatedId = landlordDAO.registerLandlord(newLandlord);
@@ -165,9 +177,25 @@ public class AuthService {
             return null;
         }
 
-        // Hash the incoming password attempt and compare with stored hash
-        String inputHash = hashPassword(plainPassword);
-        if (inputHash.equals(landlord.getPasswordHash())) {
+        boolean matches;
+        if (landlord.getPasswordSalt() == null || landlord.getPasswordSalt().trim().isEmpty()) {
+            matches = MessageDigest.isEqual(
+                    hashLegacySha256(plainPassword).getBytes(StandardCharsets.US_ASCII),
+                    landlord.getPasswordHash().getBytes(StandardCharsets.US_ASCII));
+            if (matches) {
+                String salt = generateSalt();
+                String hash = hashPassword(plainPassword, salt, PBKDF2_ITERATIONS);
+                landlordDAO.updatePasswordHash(landlord.getLandlordId(), hash, salt, PBKDF2_ITERATIONS);
+            }
+        } else {
+            String inputHash = hashPassword(plainPassword, landlord.getPasswordSalt(),
+                    landlord.getPasswordIterations() > 0
+                            ? landlord.getPasswordIterations()
+                            : PBKDF2_ITERATIONS);
+            matches = constantTimeHexEquals(inputHash, landlord.getPasswordHash());
+        }
+
+        if (matches) {
             System.out.println("[AuthService] Landlord authenticated successfully: " + landlord.getFullName());
             return landlord;
         } else {
@@ -176,40 +204,69 @@ public class AuthService {
         }
     }
 
+    public static String generateSalt() {
+        byte[] salt = new byte[SALT_BYTES];
+        new SecureRandom().nextBytes(salt);
+        return Base64.getEncoder().encodeToString(salt);
+    }
+
     /**
-     * Hashes a plaintext password using standard SHA-256 cryptographic digest.
-     * Built using Core Java standard library (java.security.MessageDigest) - No third-party jars.
-     * 
-     * Viva Explanation:
-     * 1. MessageDigest.getInstance("SHA-256") obtains the algorithm implementation.
-     * 2. password.getBytes(StandardCharsets.UTF_8) converts the password string into a byte array.
-     * 3. digest() produces a 256-bit (32-byte) hash.
-     * 4. Each byte is converted into a 2-digit hexadecimal representation, creating a fixed 64-character hash string.
-     * 
-     * @param plainPassword plaintext string
-     * @return 64-character hexadecimal SHA-256 hash string
+     * Backward-compatible helper used by verification tools.
+     * New registrations and logins use the salted overload below.
      */
     public static String hashPassword(String plainPassword) {
+        String salt = generateSalt();
+        return hashPassword(plainPassword, salt, PBKDF2_ITERATIONS);
+    }
+
+    public static String hashPassword(String plainPassword, String saltBase64, int iterations) {
+        if (plainPassword == null || saltBase64 == null) {
+            throw new IllegalArgumentException("Password and salt are required.");
+        }
+        try {
+            byte[] salt = Base64.getDecoder().decode(saltBase64);
+            PBEKeySpec spec = new PBEKeySpec(
+                    plainPassword.toCharArray(),
+                    salt,
+                    iterations,
+                    HASH_BYTES * 8);
+            try {
+                byte[] hash = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM).generateSecret(spec).getEncoded();
+                return Base64.getEncoder().encodeToString(hash);
+            } finally {
+                spec.clearPassword();
+            }
+        } catch (InvalidKeySpecException | IllegalArgumentException e) {
+            throw new RuntimeException("Password hashing failed.", e);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(PBKDF2_ALGORITHM + " is unavailable.", e);
+        }
+    }
+
+    public static String hashLegacySha256(String plainPassword) {
         if (plainPassword == null) {
             return null;
         }
         try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] hashBytes = md.digest(plainPassword.getBytes(StandardCharsets.UTF_8));
-
-            // Convert byte array to hexadecimal string
-            StringBuilder hexString = new StringBuilder();
-            for (int i = 0; i < hashBytes.length; i++) {
-                byte b = hashBytes[i];
-                String hex = Integer.toHexString(0xff & b);
-                if (hex.length() == 1) {
-                    hexString.append('0'); // Ensure 2 characters per byte
-                }
-                hexString.append(hex);
+            byte[] hashBytes = MessageDigest.getInstance("SHA-256")
+                    .digest(plainPassword.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte value : hashBytes) {
+                hex.append(String.format("%02x", value));
             }
-            return hexString.toString();
+            return hex.toString();
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("SHA-256 algorithm is not supported by current JVM runtime.", e);
+            throw new RuntimeException("SHA-256 is unavailable.", e);
         }
+    }
+
+    public static boolean constantTimeHexEquals(String left, String right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        byte[] leftBytes = left.getBytes(StandardCharsets.US_ASCII);
+        byte[] rightBytes = right.getBytes(StandardCharsets.US_ASCII);
+        return leftBytes.length == rightBytes.length
+                && MessageDigest.isEqual(leftBytes, rightBytes);
     }
 }

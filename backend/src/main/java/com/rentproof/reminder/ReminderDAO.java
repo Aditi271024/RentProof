@@ -67,7 +67,7 @@ public class ReminderDAO {
                     }
                 }
             }
-            return -1;
+            throw new SQLException("Reminder insert did not return a generated reminder ID.");
         } catch (SQLException e) {
             System.err.println("[ReminderDAO] addReminder failed: " + e.getMessage());
             throw e;
@@ -96,7 +96,7 @@ public class ReminderDAO {
                 list.add(mapRowToReminder(rs));
             }
         } catch (SQLException e) {
-            System.err.println("[ReminderDAO] getAllReminders failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve reminders from the database.", e);
         }
         return list;
     }
@@ -127,7 +127,7 @@ public class ReminderDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[ReminderDAO] getRemindersByLandlord failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve landlord reminders.", e);
         }
         return list;
     }
@@ -156,7 +156,7 @@ public class ReminderDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[ReminderDAO] getReminderById failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve reminder " + reminderId + " from the database.", e);
         }
         return null;
     }
@@ -187,7 +187,7 @@ public class ReminderDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[ReminderDAO] getRemindersByTenant failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve reminders for the selected tenant.", e);
         }
         return list;
     }
@@ -226,7 +226,7 @@ public class ReminderDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[ReminderDAO] getPendingReminders failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve pending reminders.", e);
         }
         return list;
     }
@@ -374,7 +374,7 @@ public class ReminderDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[ReminderDAO] searchReminders failed: " + e.getMessage());
+            throw new IllegalStateException("Could not search reminders.", e);
         }
         return list;
     }
@@ -420,7 +420,7 @@ public class ReminderDAO {
                 }
             }
         } catch (SQLException e) {
-            System.err.println("[ReminderDAO] getActiveTenants failed: " + e.getMessage());
+            throw new IllegalStateException("Could not retrieve active tenants for reminders.", e);
         }
         return list;
     }

@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RentProof - Edit Property</title>
+  <!-- Google Fonts: Bodoni Moda (Headings) & Poppins (UI / Body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../shared/common.css">
   <link rel="stylesheet" href="../shared/sidebar.css">
   <link rel="stylesheet" href="properties.css">
@@ -17,7 +21,7 @@
          ========================================== -->
     <aside class="sidebar" id="appSidebar">
       <div class="sidebar-header">
-        <a href="properties.html" class="brand-link">
+        <a href="../dashboard/dashboard.html" class="brand-link">
           <div class="brand-logo-icon">RP</div>
           <span class="brand-name">Rent<span>Proof</span></span>
         </a>
@@ -25,12 +29,14 @@
 
       <nav class="sidebar-nav">
         <div class="nav-section-title">Main Portal</div>
-
+        
+        <!-- 1. Dashboard -->
         <a href="../dashboard/dashboard.html" class="nav-item" data-tooltip="Dashboard">
           <span class="nav-icon">📊</span>
           <span class="nav-label">Dashboard</span>
         </a>
-        
+
+        <!-- 2. Properties -->
         <a href="properties.html" class="nav-item active" data-tooltip="Properties">
           <span class="nav-icon">🏢</span>
           <span class="nav-label">Properties</span>
@@ -38,36 +44,42 @@
 
         <div class="nav-section-title">Team Modules</div>
 
-        <a href="javascript:void(0)" class="nav-item" data-tooltip="Tenants (Shweta)" onclick="showModuleNotice('Tenants Management', 'Shweta')">
+        <!-- 3. Tenants -->
+        <a href="../tenants/tenants.html" class="nav-item" data-tooltip="Tenants">
           <span class="nav-icon">👥</span>
           <span class="nav-label">Tenants</span>
         </a>
 
-        <a href="../payments/payments.html" class="nav-item" data-tooltip="Payments (Aanvi)">
+        <!-- 4. Rent & Payments -->
+        <a href="../payments/payments.html" class="nav-item" data-tooltip="Rent & Payments">
           <span class="nav-icon">💳</span>
           <span class="nav-label">Rent & Payments</span>
         </a>
 
-        <a href="../reminders/reminders.html" class="nav-item" data-tooltip="Reminders (Gungun)">
+        <!-- 5. Reminders -->
+        <a href="../reminders/reminders.html" class="nav-item" data-tooltip="Reminders">
           <span class="nav-icon">🔔</span>
           <span class="nav-label">Reminders</span>
         </a>
 
         <div class="nav-section-title">System</div>
 
-        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports" onclick="alert('Reports module placeholder.')">
+        <!-- 6. Reports -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Reports">
           <span class="nav-icon">📈</span>
           <span class="nav-label">Reports</span>
         </a>
 
-        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings" onclick="alert('Settings module placeholder.')">
+        <!-- 7. Settings -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings">
           <span class="nav-icon">⚙️</span>
           <span class="nav-label">Settings</span>
         </a>
       </nav>
 
+      <!-- 8. Sidebar Footer / Logout -->
       <div class="sidebar-footer">
-        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Logout">
+        <a href="javascript:void(0)" class="logout-btn" id="logoutBtn" data-tooltip="Sign Out">
           <span class="nav-icon">🚪</span>
           <span class="logout-text">Sign Out</span>
         </a>
@@ -265,6 +277,7 @@
 
   </div>
 
+  <script src="../shared/security.js"></script>
   <script src="properties.js"></script>
 </body>
 </html>

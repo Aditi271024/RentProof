@@ -55,7 +55,7 @@ RentProof/
 │   ├── properties/                   # Integrated sidebar navigation to Reminders
 │   └── shared/                       # common.css & sidebar.css
 ├── database/
-│   └── rentproof.sql                 # MySQL schema with reminders table & seed data
+│   └── rentproof.sql                 # Non-destructive MySQL schema setup
 ├── compile-and-run.sh                # macOS/Linux one-click compilation & test runner
 └── compile-and-run.bat               # Windows batch compilation & test runner
 ```

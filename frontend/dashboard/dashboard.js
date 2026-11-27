@@ -1,291 +1,327 @@
 /**
- * RENTPROOF - DASHBOARD MODULE JAVASCRIPT
- * Module: Dashboard Analytics Module
- * Developer: Gungun (BTech CSE Project)
+ * RENTPROOF - LANDLORD DASHBOARD CONTROLLER (dashboard.js)
+ * Module: Dashboard & Portfolio Overview
+ * Author: Aditi Sharma
  * 
  * Features:
- * - Pure Vanilla JavaScript (No React, Vue, or Angular)
- * - Live Core Java API integration via RentProofServer on port 8080
- * - Real-time statistics directly from MySQL database:
- *   * Total properties & room inventory (occupied vs vacant with rate)
- *   * Financials (Total rent collected, successful, pending, overdue)
- *   * Reminders (Total, pending, upcoming within 7 days, overdue alerts)
- *   * Active tenants count
- * - Actionable urgent reminders widget with quick-completion workflow
- * - Unified recent activity feed
- * - One-click live data refresh
- * - Graceful offline fallback
+ * - Real-time statistics aggregation directly from MySQL via JDBC API (/api/dashboard/summary)
+ * - Explicit connection status when the backend is unavailable
+ * - Welcome greeting with active Landlord session and live date formatting
+ * - Dynamic Property room breakdown (Total, Occupied, Vacant)
+ * - Recent payments audit table & Pending rent collections
+ * - Upcoming scheduled reminders feed
+ * - Full responsive sidebar state persistence
  */
 
-const API_BASE = window.location.origin.includes(":8080") ? "" : "http://localhost:8080";
-
-// Fallback seed data (strictly aligned with database/rentproof.sql)
-const FALLBACK_STATS = {
-  totalProperties: 5,
-  totalTenants: 3,
-  totalRooms: 13,
-  occupiedRooms: 6,
-  vacantRooms: 6,
-  maintenanceRooms: 1,
-  occupancyRate: 46.2,
-  totalPayments: 3,
-  totalRentCollected: 28000.0,
-  completedPayments: 3,
-  pendingPayments: 0,
-  overduePayments: 0,
-  totalReminders: 2,
-  pendingReminders: 2,
-  upcomingReminders: 1,
-  overdueReminders: 0,
-  completedReminders: 0
-};
-
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
+  if (!(await window.RentProofSecurity.requireSession())) return;
   setupNavigationAndSidebar();
   setupActiveUser();
-  loadAllDashboardData();
-
-  const refreshBtn = document.getElementById("refreshDashboardBtn");
-  if (refreshBtn) {
-    refreshBtn.addEventListener("click", () => {
-      refreshBtn.textContent = "⏳ Refreshing...";
-      refreshBtn.disabled = true;
-      loadAllDashboardData(() => {
-        refreshBtn.textContent = "🔄 Refresh Live Data";
-        refreshBtn.disabled = false;
-        showToast("Dashboard metrics refreshed from MySQL!", "success");
-      });
+  displayLiveDate();
+  const searchInput = document.getElementById("dashboardSearchInput");
+  if (searchInput) {
+    searchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") window.location.href = "../properties/properties.html";
     });
   }
+  const notificationsButton = document.getElementById("dashboardNotificationsBtn");
+  if (notificationsButton) {
+    notificationsButton.addEventListener("click", () => {
+      window.location.href = "../reminders/reminders.html";
+    });
+  }
+  await loadDashboardData();
 });
 
-function loadAllDashboardData(callback) {
-  Promise.all([
-    fetchDashboardStats(),
-    fetchUrgentReminders(),
-    fetchRecentActivities()
-  ]).finally(() => {
-    if (typeof callback === "function") callback();
+/**
+ * Synchronizes and controls the collapsible sidebar navigation.
+ */
+function setupNavigationAndSidebar() {
+  const sidebar = document.getElementById("appSidebar");
+  const toggleBtn = document.getElementById("sidebarToggleBtn");
+
+  if (!sidebar || !toggleBtn) return;
+
+  const isCollapsed = localStorage.getItem("rentproof_sidebar_collapsed") === "true";
+  if (isCollapsed) {
+    sidebar.classList.add("collapsed");
+  }
+
+  toggleBtn.addEventListener("click", () => {
+    sidebar.classList.toggle("collapsed");
+    localStorage.setItem("rentproof_sidebar_collapsed", sidebar.classList.contains("collapsed"));
   });
-}
 
-/**
- * 1. Fetches live system statistics from GET /api/dashboard/stats
- */
-async function fetchDashboardStats() {
-  const statusPill = document.getElementById("systemStatusPill");
-  try {
-    const res = await fetch(`${API_BASE}/api/dashboard/stats`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const stats = await res.json();
-
-    renderStatsUI(stats);
-    if (statusPill) {
-      statusPill.className = "system-status-pill";
-      statusPill.innerHTML = `<span class="status-dot"></span> MySQL Connected &bull; Port 8080`;
+  window.addEventListener("resize", () => {
+    if (window.innerWidth <= 768) {
+      sidebar.classList.remove("collapsed");
     }
-  } catch (err) {
-    console.warn("Backend API unavailable, using local data:", err.message);
-    renderStatsUI(FALLBACK_STATS);
-    if (statusPill) {
-      statusPill.className = "system-status-pill offline";
-      statusPill.innerHTML = `<span class="status-dot"></span> Offline Fallback Mode`;
-    }
-  }
-}
-
-/**
- * Renders stats onto the DOM.
- */
-function renderStatsUI(stats) {
-  // Properties Card
-  setText("dashTotalProperties", stats.totalProperties ?? 0);
-  setText("dashTotalRooms", stats.totalRooms ?? 0);
-  setText("dashOccupiedRooms", stats.occupiedRooms ?? 0);
-  setText("dashVacantRooms", stats.vacantRooms ?? 0);
-  setText("dashOccupancyRate", `${(stats.occupancyRate ?? 0).toFixed(1)}%`);
-
-  const fillBar = document.getElementById("occupancyProgressBar");
-  if (fillBar) {
-    fillBar.style.width = `${Math.min(100, Math.max(0, stats.occupancyRate ?? 0))}%`;
-  }
-
-  // Financials Card
-  const formattedRent = Number(stats.totalRentCollected ?? 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
   });
-  setText("dashTotalRentCollected", `₹${formattedRent}`);
-  setText("dashPaidPayments", stats.completedPayments ?? 0);
-  setText("dashPendingPayments", stats.pendingPayments ?? 0);
-  setText("dashOverduePayments", stats.overduePayments ?? 0);
 
-  // Reminders Card (Gungun's Module)
-  setText("dashTotalReminders", stats.totalReminders ?? 0);
-  setText("dashPendingReminders", stats.pendingReminders ?? 0);
-  setText("dashUpcomingReminders", stats.upcomingReminders ?? 0);
-  setText("dashOverdueReminders", stats.overdueReminders ?? 0);
-
-  // Tenants Card
-  setText("dashTotalTenants", stats.totalTenants ?? 0);
 }
 
 /**
- * 2. Fetches urgent / overdue reminders for action widget.
+ * Loads current logged-in landlord profile.
  */
-async function fetchUrgentReminders() {
-  const container = document.getElementById("urgentRemindersBody");
-  if (!container) return;
+function setupActiveUser() {
+  const user = JSON.parse(localStorage.getItem("rentproof_user")) || {
+    fullName: "Landlord",
+    email: ""
+  };
 
+  const nameEl = document.getElementById("welcomeLandlordName");
+  if (nameEl) nameEl.textContent = user.fullName;
+
+  const headerAvatarEl = document.getElementById("headerAvatarInitials");
+  if (headerAvatarEl) {
+    const initials = user.fullName
+      .split(" ")
+      .map(n => n[0])
+      .join("")
+      .toUpperCase()
+      .substring(0, 2);
+    headerAvatarEl.textContent = initials || "AS";
+  }
+
+  const headerNameEl = document.getElementById("headerLandlordName");
+  if (headerNameEl) headerNameEl.textContent = user.fullName;
+}
+
+/**
+ * Renders the live formatted calendar date in the welcome section.
+ */
+function displayLiveDate() {
+  const dateEl = document.getElementById("currentDateDisplay");
+  if (!dateEl) return;
+
+  const now = new Date();
+  const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  dateEl.textContent = now.toLocaleDateString('en-IN', options);
+}
+
+/**
+ * Fetches dashboard analytics from the authenticated Java backend.
+ */
+async function loadDashboardData() {
   try {
-    const res = await fetch(`${API_BASE}/api/dashboard/urgent-reminders`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const list = await res.json();
-    renderUrgentRemindersUI(list);
-  } catch (err) {
-    // Fallback using seed
-    renderUrgentRemindersUI([
-      {
-        reminderId: 1,
-        title: "Upcoming December Rent Due",
-        dueDate: "2026-12-05",
-        reminderType: "Rent Due",
-        reminderStatus: "Pending",
-        tenantName: "Rohan Verma",
-        daysLeft: 9
-      },
-      {
-        reminderId: 2,
-        title: "Bi-annual Fire Extinguisher Inspection",
-        dueDate: "2026-11-30",
-        reminderType: "Maintenance",
-        reminderStatus: "Pending",
-        tenantName: "General Property",
-        daysLeft: 4
-      }
-    ]);
+    const response = await fetch("/api/dashboard/summary", {
+      credentials: "same-origin",
+      headers: { "Accept": "application/json" }
+    });
+    if (!response.ok) throw new Error(`Dashboard API returned HTTP ${response.status}.`);
+    const data = await response.json();
+    if (!data.success || !data.stats) throw new Error("Dashboard API returned an invalid response.");
+    renderDashboard(data.stats, data.properties, data.recentPayments, data.pendingRent, data.reminders, true);
+  } catch (error) {
+    console.error("[Dashboard] Failed to load live dashboard data:", error);
+    const modeEl = document.getElementById("connectionModeText");
+    if (modeEl) modeEl.textContent = "Database unavailable";
+    [
+      "statTotalProperties",
+      "statTotalRooms",
+      "statOccupiedRooms",
+      "statTotalTenants",
+      "statRentCollected",
+      "statPendingRent"
+    ].forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) element.textContent = "N/A";
+    });
+    ["propertiesTableBody", "recentPaymentsBody", "pendingRentBody"].forEach((id) => {
+      const element = document.getElementById(id);
+      if (element) element.textContent = "Dashboard data is unavailable.";
+    });
+    const reminders = document.getElementById("remindersListContainer");
+    if (reminders) reminders.textContent = "Dashboard data is unavailable.";
   }
 }
 
-function renderUrgentRemindersUI(reminders) {
-  const container = document.getElementById("urgentRemindersBody");
-  if (!container) return;
+/**
+ * Renders all dashboard sections.
+ */
+function renderDashboard(stats, properties, recentPayments, pendingRent, reminders, isLiveBackend) {
+  // 1. Statistics Cards
+  document.getElementById("statTotalProperties").textContent = stats.totalProperties || 0;
+  document.getElementById("statTotalRooms").textContent = stats.totalRooms || 0;
+  document.getElementById("statOccupiedRooms").textContent = stats.occupiedRooms || 0;
+  document.getElementById("statTotalTenants").textContent = stats.totalTenants || 0;
+  document.getElementById("statRentCollected").textContent = formatCurrency(stats.rentCollected || 0);
+  document.getElementById("statPendingRent").textContent = formatCurrency(stats.pendingRent || 0);
 
-  if (!reminders || reminders.length === 0) {
-    container.innerHTML = `
+  // Connection mode indicator
+  const modeEl = document.getElementById("connectionModeText");
+  if (modeEl) {
+    modeEl.textContent = isLiveBackend ? "Live MySQL JDBC Connected" : "Local Database Mode";
+  }
+
+  // 2. Property Overview Table
+  renderPropertyOverview(properties);
+
+  // 3. Recent Payments Table
+  renderRecentPayments(recentPayments);
+
+  // 4. Pending Rent Table
+  renderPendingRent(pendingRent);
+
+  // 5. Upcoming Reminders
+  renderUpcomingReminders(reminders);
+}
+
+/**
+ * Renders the Property Inventory Overview Table.
+ */
+function renderPropertyOverview(properties) {
+  const tbody = document.getElementById("propertiesTableBody");
+  if (!tbody) return;
+
+  if (!properties || properties.length === 0) {
+    tbody.innerHTML = `
       <tr>
-        <td colspan="5" style="text-align: center; color: var(--slate-muted); padding: 24px;">
-          🎉 All rent reminders and maintenance notices are currently resolved!
+        <td colspan="5" class="empty-placeholder">
+          <div class="icon">🏢</div>
+          <p>No properties registered yet. Click <strong>Add Property</strong> to get started.</p>
         </td>
       </tr>
     `;
     return;
   }
 
-  container.innerHTML = reminders.map(r => {
-    const isOverdue = r.daysLeft < 0;
-    const rowClass = isOverdue ? "is-overdue" : "";
+  tbody.innerHTML = properties.map(p => `
+    <tr>
+      <td>
+        <strong style="color: var(--navy);">${escapeHtml(p.propertyName)}</strong>
+        <div style="font-size: 0.78rem; color: var(--steel-blue);">${escapeHtml(p.propertyType || 'Residential')}</div>
+      </td>
+      <td>${escapeHtml(p.location)}</td>
+      <td><strong>${p.totalRooms}</strong> Rooms</td>
+      <td>
+        <div class="room-breakdown">
+          <span class="badge-occupied">${p.occupiedRooms} Occupied</span>
+          <span class="badge-vacant">${p.vacantRooms} Vacant</span>
+        </div>
+      </td>
+      <td>
+        <a href="../properties/edit-property.html?id=${p.propertyId}" class="card-header-link">Manage →</a>
+      </td>
+    </tr>
+  `).join("");
+}
 
-    let badge = "";
-    if (isOverdue) {
-      badge = `<span style="color: var(--danger); font-weight: 700;">⚠️ Overdue (${Math.abs(r.daysLeft)}d ago)</span>`;
-    } else if (r.daysLeft === 0) {
-      badge = `<span style="color: #B45309; font-weight: 700;">⏰ Due Today</span>`;
-    } else {
-      badge = `<span style="color: #1D4ED8; font-weight: 600;">🗓️ Due in ${r.daysLeft} days</span>`;
-    }
+/**
+ * Renders Recent Payment Transactions.
+ */
+function renderRecentPayments(payments) {
+  const tbody = document.getElementById("recentPaymentsBody");
+  if (!tbody) return;
 
+  if (!payments || payments.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="empty-placeholder">
+          <div class="icon">💳</div>
+          <p>No recent payment records found in database.</p>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = payments.map(pm => {
+    const statusClass = (pm.paymentStatus || "").toLowerCase();
     return `
-      <tr class="${rowClass}">
-        <td><strong>#REM-${r.reminderId}</strong></td>
-        <td>
-          <span class="urgent-tenant-text">${escapeHtml(r.tenantName || 'General Property')}</span>
-        </td>
-        <td>
-          <span class="urgent-title-text">${escapeHtml(r.title)}</span>
-        </td>
-        <td>
-          <div>${formatDisplayDate(r.dueDate)}</div>
-          <div style="font-size: 0.72rem;">${badge}</div>
-        </td>
-        <td style="text-align: right;">
-          <button 
-            class="btn btn-outline btn-sm" 
-            title="Mark as Completed in MySQL"
-            onclick="quickCompleteReminder(${r.reminderId})"
-          >
-            ✓ Resolve
-          </button>
-        </td>
+      <tr>
+        <td><strong>${escapeHtml(pm.tenantName)}</strong></td>
+        <td>${escapeHtml(pm.propertyName)}</td>
+        <td><strong>${formatCurrency(pm.amount)}</strong></td>
+        <td>${escapeHtml(pm.paymentDate)}</td>
+        <td><span class="status-pill ${statusClass}">${escapeHtml(pm.paymentStatus)}</span></td>
       </tr>
     `;
   }).join("");
 }
 
 /**
- * Quick-resolve a reminder directly from the Dashboard table.
+ * Renders Pending / Overdue Rent Collections.
  */
-async function quickCompleteReminder(id) {
-  try {
-    const res = await fetch(`${API_BASE}/api/reminders/update-status`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reminderId: id, reminderStatus: "Completed" })
-    });
-    if (!res.ok) throw new Error("Status update failed");
-    showToast(`Reminder #REM-${id} marked as Completed!`, "success");
-    loadAllDashboardData();
-  } catch (e) {
-    showToast(`Completed Reminder #REM-${id} locally.`, "info");
-    loadAllDashboardData();
-  }
-}
+function renderPendingRent(pending) {
+  const tbody = document.getElementById("pendingRentBody");
+  if (!tbody) return;
 
-/**
- * 3. Fetches live unified activity stream from GET /api/dashboard/recent-activity
- */
-async function fetchRecentActivities() {
-  const container = document.getElementById("dashboardActivityContainer");
-  if (!container) return;
-
-  try {
-    const res = await fetch(`${API_BASE}/api/dashboard/recent-activity`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const acts = await res.json();
-    renderActivitiesUI(acts);
-  } catch (err) {
-    renderActivitiesUI([
-      { icon: "🔔", description: "Upcoming Rental Due reminder scheduled for Rohan Verma", createdAt: "2026-11-01" },
-      { icon: "🔧", description: "Fire safety inspection maintenance scheduled", createdAt: "2026-11-02" },
-      { icon: "💳", description: "Payment of Rs. 8500 received from Rohan Verma (November 2026)", createdAt: "2026-11-05" }
-    ]);
-  }
-}
-
-function renderActivitiesUI(activities) {
-  const container = document.getElementById("dashboardActivityContainer");
-  if (!container) return;
-
-  if (!activities || activities.length === 0) {
-    container.innerHTML = `<p style="font-size: 0.85rem; color: var(--slate-muted); padding: 12px;">No activity logged yet.</p>`;
+  if (!pending || pending.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="empty-placeholder">
+          <div class="icon">✅</div>
+          <p>All rental payments are currently up to date! Zero pending dues.</p>
+        </td>
+      </tr>
+    `;
     return;
   }
 
-  container.innerHTML = activities.map(act => `
-    <div class="activity-item-row">
-      <div class="activity-icon">${act.icon || '📌'}</div>
-      <div class="activity-body">
-        <div class="activity-text">${escapeHtml(act.description)}</div>
-        <div class="activity-time">${formatDisplayDate(act.createdAt)}</div>
-      </div>
-    </div>
+  tbody.innerHTML = pending.map(pr => `
+    <tr>
+      <td><strong>${escapeHtml(pr.tenantName)}</strong></td>
+      <td>${escapeHtml(pr.propertyName)}</td>
+      <td><strong style="color: var(--danger);">${formatCurrency(pr.amount)}</strong></td>
+      <td>${escapeHtml(pr.paymentDate)}</td>
+      <td><span class="status-pill pending">Pending</span></td>
+    </tr>
   `).join("");
 }
 
-// Helpers
-function setText(id, text) {
-  const el = document.getElementById(id);
-  if (el) el.textContent = text;
+/**
+ * Renders Upcoming Scheduled Reminders.
+ */
+function renderUpcomingReminders(reminders) {
+  const container = document.getElementById("remindersListContainer");
+  if (!container) return;
+
+  if (!reminders || reminders.length === 0) {
+    container.innerHTML = `
+      <div class="empty-placeholder">
+        <div class="icon">🔔</div>
+        <p>No pending reminders. All system alerts are clear.</p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <ul class="reminder-list">
+      ${reminders.map(r => `
+        <li class="reminder-item">
+          <div class="reminder-main">
+            <span class="reminder-icon">${getReminderEmoji(r.reminderType)}</span>
+            <div class="reminder-details">
+              <h4>${escapeHtml(r.title)}</h4>
+              <p>Target: <strong>${escapeHtml(r.relatedTo)}</strong> &bull; Category: ${escapeHtml(r.reminderType || 'General')}</p>
+            </div>
+          </div>
+          <div class="reminder-meta">
+            <div class="reminder-due">Due: ${escapeHtml(r.dueDate)}</div>
+            <span class="status-pill pending">${escapeHtml(r.reminderStatus)}</span>
+          </div>
+        </li>
+      `).join("")}
+    </ul>
+  `;
+}
+
+function getReminderEmoji(type) {
+  switch ((type || "").toLowerCase()) {
+    case 'rent due': return '💰';
+    case 'maintenance': return '🔧';
+    case 'agreement expiry': return '📄';
+    default: return '🔔';
+  }
+}
+
+function formatCurrency(amount) {
+  return "₹" + Number(amount || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 }
 
 function escapeHtml(str) {
@@ -298,64 +334,6 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
-function formatDisplayDate(dateStr) {
-  if (!dateStr) return "N/A";
-  try {
-    const d = new Date(dateStr.replace(" ", "T"));
-    if (isNaN(d.getTime())) return dateStr;
-    return d.toLocaleDateString("en-US", {
-      day: "numeric",
-      month: "short",
-      year: "numeric"
-    });
-  } catch (e) {
-    return dateStr;
-  }
-}
-
-function setupNavigationAndSidebar() {
-  const toggleBtn = document.getElementById("sidebarToggleBtn");
-  const sidebar = document.getElementById("appSidebar");
-
-  if (toggleBtn && sidebar) {
-    const isCollapsed = localStorage.getItem("rentproof_sidebar_collapsed") === "true";
-    if (isCollapsed) sidebar.classList.add("collapsed");
-
-    toggleBtn.addEventListener("click", () => {
-      sidebar.classList.toggle("collapsed");
-      localStorage.setItem("rentproof_sidebar_collapsed", sidebar.classList.contains("collapsed") ? "true" : "false");
-    });
-  }
-}
-
-function setupActiveUser() {
-  const nameEl = document.getElementById("landlordDisplayName");
-  const avatarEl = document.getElementById("landlordAvatarInitials");
-  if (nameEl) nameEl.textContent = "Aditi Sharma";
-  if (avatarEl) avatarEl.textContent = "AS";
-}
-
-function showModuleNotice(moduleName, leadName) {
-  alert(`RentProof Team Module Notice:\n\n${moduleName}\nModule Lead: ${leadName}\n\nMaintained independently by assigned team members.`);
-}
-
-function showToast(message, type = "info") {
-  let container = document.getElementById("toastContainer");
-  if (!container) {
-    container = document.createElement("div");
-    container.id = "toastContainer";
-    container.className = "toast-container";
-    document.body.appendChild(container);
-  }
-
-  const toast = document.createElement("div");
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `<span>${escapeHtml(message)}</span>`;
-  container.appendChild(toast);
-
-  setTimeout(() => {
-    toast.style.opacity = "0";
-    toast.style.transition = "opacity 300ms ease";
-    setTimeout(() => toast.remove(), 300);
-  }, 3500);
+function showModuleNotice(moduleName, memberName) {
+  alert(`RentProof Module Notice:\nThe ${moduleName} module is assigned to ${memberName}.\nThis module integrates with the centralized 'rentproof' MySQL database.`);
 }
