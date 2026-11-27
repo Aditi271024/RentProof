@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RentProof - Master Landlord Dashboard</title>
+  <link rel="stylesheet" href="../shared/common.css">
+  <link rel="stylesheet" href="../shared/sidebar.css">
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+
+  <div class="app-container">
+
+    <!-- ==========================================
+         COLLAPSIBLE LEFT SIDEBAR (Midnight Blue)
+         ========================================== -->
+    <aside class="sidebar" id="appSidebar">
+      
+      <!-- Brand Logo / Header -->
+      <div class="sidebar-header">
+        <a href="dashboard.html" class="brand-link">
+          <div class="brand-logo-icon">RP</div>
+          <span class="brand-name">Rent<span>Proof</span></span>
+        </a>
+      </div>
+
+      <!-- Navigation Menu Items -->
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">Main Portal</div>
+        
+        <a href="dashboard.html" class="nav-item active" data-tooltip="Dashboard">
+          <span class="nav-icon">📊</span>
+          <span class="nav-label">Dashboard</span>
+        </a>
+
+        <a href="../properties/properties.html" class="nav-item" data-tooltip="Properties">
+          <span class="nav-icon">🏢</span>
+          <span class="nav-label">Properties</span>
+        </a>
+
+        <div class="nav-section-title">Team Modules</div>
+
+        <!-- Shweta's Module Link -->
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Tenants (Shweta)" onclick="showModuleNotice('Tenants Management', 'Shweta')">
+          <span class="nav-icon">👥</span>
+          <span class="nav-label">Tenants</span>
+        </a>
+
+        <!-- Aanvi's Module Link -->
+        <a href="../payments/payments.html" class="nav-item" data-tooltip="Rent & Payments (Aanvi)">
+          <span class="nav-icon">💳</span>
+          <span class="nav-label">Rent &amp; Payments</span>
+        </a>
+
+        <!-- Gungun's Module Link -->
+        <a href="../reminders/reminders.html" class="nav-item" data-tooltip="Reminders & Alerts (Gungun)">
+          <span class="nav-icon">🔔</span>
+          <span class="nav-label">Reminders</span>
+        </a>
+
+        <div class="nav-section-title">System</div>
+
+        <a href="../payments/payment-history.html" class="nav-item" data-tooltip="Audit & Reports">
+          <span class="nav-icon">📈</span>
+          <span class="nav-label">Reports &amp; Audit</span>
+        </a>
+
+        <a href="javascript:void(0)" class="nav-item" data-tooltip="Settings" onclick="alert('Settings module: Manage landlord profile and account preferences.')">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-label">Settings</span>
+        </a>
+      </nav>
+
+      <!-- Sidebar Footer / Logout -->
+      <div class="sidebar-footer">
+        <a href="../auth/login.html" class="logout-btn" id="logoutBtn" data-tooltip="Logout">
+          <span class="nav-icon">🚪</span>
+          <span class="logout-text">Sign Out</span>
+        </a>
+      </div>
+
+    </aside>
+
+    <!-- ==========================================
+         MAIN CONTENT AREA (Ivory Canvas)
+         ========================================== -->
+    <div class="main-wrapper">
+
+      <!-- TOP NAVBAR -->
+      <header class="top-navbar">
+        <div class="navbar-left">
+          <button class="sidebar-toggle-btn" id="sidebarToggleBtn" title="Toggle Navigation Sidebar">
+            ☰
+          </button>
+          
+          <!-- Live Connectivity Status Indicator -->
+          <div class="system-status-pill" id="systemStatusPill">
+            <span class="status-dot"></span> Checking Core Java Server...
+          </div>
+        </div>
+
+        <div class="navbar-right">
+          <button class="btn btn-outline btn-sm" id="refreshDashboardBtn" title="Refresh Live Data from MySQL">
+            🔄 Refresh Live Data
+          </button>
+
+          <button class="notification-btn" title="System Notifications" onclick="alert('System operating normally on Core Java HttpServer.')">
+            🔔
+            <span class="notification-badge"></span>
+          </button>
+
+          <!-- Landlord Profile Pill -->
+          <div class="landlord-profile-pill" onclick="alert('Logged in Landlord: Aditi Sharma\nRole: Property Administrator\nActive Session on RentProofServer:8080')">
+            <div class="profile-avatar" id="landlordAvatarInitials">AS</div>
+            <div class="profile-details">
+              <span class="profile-name" id="landlordDisplayName">Aditi Sharma</span>
+              <span class="profile-role">Landlord &bull; Active</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- PAGE CONTENT CANVAS -->
+      <main class="page-content">
+
+        <!-- Title & Action Header -->
+        <div class="page-header-bar">
+          <div class="page-title-block">
+            <h1>Master Rental Dashboard</h1>
+            <p>Unified oversight of properties, live rental collections, active tenants, and reminder alerts.</p>
+          </div>
+          <div class="header-actions-group">
+            <a href="../reminders/add-reminder.html" class="btn btn-primary">
+              🔔 Schedule Reminder
+            </a>
+            <a href="../payments/add-payment.html" class="btn btn-outline">
+              💳 Record Payment
+            </a>
+          </div>
+        </div>
+
+        <!-- 4 Major System Metric Cards -->
+        <section class="dashboard-metrics-grid">
+
+          <!-- 1. Properties & Rooms Inventory -->
+          <div class="metric-card">
+            <div>
+              <div class="metric-header">
+                <span class="metric-label">Properties &amp; Units</span>
+                <div class="metric-icon-badge properties">🏢</div>
+              </div>
+              <div class="metric-main-value" id="dashTotalProperties">0</div>
+            </div>
+            <div>
+              <div class="metric-sub-breakdown">
+                <span class="sub-item">Total Rooms: <strong id="dashTotalRooms">0</strong></span>
+                <span class="sub-item success">Occupied: <strong id="dashOccupiedRooms">0</strong></span>
+                <span class="sub-item warning">Vacant: <strong id="dashVacantRooms">0</strong></span>
+              </div>
+              <div class="progress-bar-container" title="Occupancy Rate">
+                <div class="progress-bar-fill" id="occupancyProgressBar" style="width: 0%;"></div>
+              </div>
+              <div style="font-size: 0.72rem; color: var(--slate-muted); margin-top: 4px; text-align: right;">
+                Occupancy Rate: <strong id="dashOccupancyRate" style="color: var(--navy);">0%</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Financial Collections (Aanvi's Module) -->
+          <div class="metric-card">
+            <div>
+              <div class="metric-header">
+                <span class="metric-label">Rent Collections</span>
+                <div class="metric-icon-badge payments">💳</div>
+              </div>
+              <div class="metric-main-value" id="dashTotalRentCollected">₹0.00</div>
+            </div>
+            <div>
+              <div class="metric-sub-breakdown">
+                <span class="sub-item success">Settled: <strong id="dashPaidPayments">0</strong></span>
+                <span class="sub-item warning">Pending: <strong id="dashPendingPayments">0</strong></span>
+                <span class="sub-item alert">Overdue: <strong id="dashOverduePayments">0</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Reminders & Alerts (Gungun's Module) -->
+          <div class="metric-card">
+            <div>
+              <div class="metric-header">
+                <span class="metric-label">Reminders &amp; Alerts</span>
+                <div class="metric-icon-badge reminders">🔔</div>
+              </div>
+              <div class="metric-main-value" id="dashTotalReminders">0</div>
+            </div>
+            <div>
+              <div class="metric-sub-breakdown">
+                <span class="sub-item warning">Pending: <strong id="dashPendingReminders">0</strong></span>
+                <span class="sub-item">Upcoming (7d): <strong id="dashUpcomingReminders" style="color: #1D4ED8;">0</strong></span>
+                <span class="sub-item alert">Overdue: <strong id="dashOverdueReminders">0</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Active Tenants Directory (Shweta's Module) -->
+          <div class="metric-card">
+            <div>
+              <div class="metric-header">
+                <span class="metric-label">Registered Tenants</span>
+                <div class="metric-icon-badge tenants">👥</div>
+              </div>
+              <div class="metric-main-value" id="dashTotalTenants">0</div>
+            </div>
+            <div>
+              <div class="metric-sub-breakdown">
+                <span class="sub-item">Active Leases: <strong>100%</strong></span>
+                <span class="sub-item"><a href="../reminders/add-reminder.html" style="color: var(--steel-blue); text-decoration: none; font-weight: 600;">+ Notice</a></span>
+              </div>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- Quick Action Shortcuts Bar -->
+        <section class="quick-actions-bar">
+          <div class="quick-actions-title">
+            <span>⚡ Portal Navigation &amp; Shortcuts</span>
+          </div>
+          <div class="quick-action-buttons">
+            <a href="../reminders/reminders.html" class="btn btn-outline btn-sm">
+              🔔 View All Reminders
+            </a>
+            <a href="../reminders/add-reminder.html" class="btn btn-primary btn-sm">
+              ➕ Add Reminder
+            </a>
+            <a href="../payments/payments.html" class="btn btn-outline btn-sm">
+              💳 Payments Dashboard
+            </a>
+            <a href="../properties/properties.html" class="btn btn-outline btn-sm">
+              🏢 Property Catalog
+            </a>
+          </div>
+        </section>
+
+        <!-- Two-Column Sections: Urgent Reminders + Activity Feed -->
+        <div class="dashboard-sections-grid">
+
+          <!-- Left Column: Urgent Reminders & Due Dates Widget -->
+          <div class="section-card">
+            <div class="section-card-header">
+              <div class="section-card-title">
+                <span>⏰ Urgent Rent Dues &amp; Action Items</span>
+              </div>
+              <a href="../reminders/reminders.html" style="font-size: 0.8rem; color: var(--steel-blue); font-weight: 600; text-decoration: none;">
+                Manage All &rarr;
+              </a>
+            </div>
+
+            <div class="table-responsive">
+              <table class="urgent-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Recipient</th>
+                    <th>Notice Title</th>
+                    <th>Due Timeline</th>
+                    <th style="text-align: right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="urgentRemindersBody">
+                  <!-- Injected via dashboard.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Right Column: Live Recent Activity Stream -->
+          <div class="section-card">
+            <div class="section-card-header">
+              <div class="section-card-title">
+                <span>⏱️ Live System Audit Trail</span>
+              </div>
+              <span style="font-size: 0.75rem; color: var(--slate-muted);">MySQL rentproof</span>
+            </div>
+
+            <div class="activity-list" id="dashboardActivityContainer">
+              <!-- Injected via dashboard.js -->
+            </div>
+          </div>
+
+        </div>
+
+      </main>
+
+    </div>
+
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
